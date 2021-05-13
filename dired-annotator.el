@@ -69,6 +69,9 @@
 (defvar dired-annotator--hash-mode 'head16kmd5 "currently configured hash mode")
 
 (defvar-local dired-annotator--icons-shown-p nil "are icons currently shown in the dired buffer")
+(defvar-local dired-annotator--note-should-not-popup nil
+  "note should not popup again if show note is triggered.
+this allows for trigger show/hide behaviour if the same command is repeated.")
 
 ;; --------------------------------------------------------------------------------
 (unless (file-directory-p dired-annotator-annotations-folder)
@@ -226,6 +229,8 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
 
 (defun dired-annotator--remove-all-posframes ()
   "remove all posframes and remove precommand hook to do so"
+  (unless (eq 'dired-annotator-show-note (lookup-key dired-mode-map (this-single-command-keys)))
+    (setq dired-annotator--note-should-not-popup nil))
   (ignore-errors
     (posframe-hide-all))
   (remove-hook 'pre-command-hook #'dired-annotator--remove-all-posframes))
@@ -305,20 +310,44 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
                      (dired-annotator--overlays-in start end)))))
     (+ 1 (overlay-start (car ov)))))
 
+(defun dired-annotator--wrapped-revert-buffer (orig-func &rest params)
+  "make sure that buffer reverts either hide remaining icons, or redisplays them appropriately"
+  (apply orig-func params)
+  (dired-annotator--update-icon-display))
+
+(defun dired-annotator--after-omit-expunge (&rest params)
+  (dired-annotator--update-icon-display))
+
+(defun dired-annotator--update-icon-display ()
+  (when (derived-mode-p 'dired-mode)
+    (if dired-annotator--icons-shown-p
+        (dired-annotator--show-icons)
+      (dired-annotator--hide-icons))))
+
+(defun dired-annotator--hide-icons ()
+  (dired-annotator--hide-icons-in-region (point-min) (point-max)))
+
+(defun dired-annotator--show-icons ()
+  (dired-annotator--hide-icons)
+  (dired-annotator--show-icons-in-region (point-min) (point-max)))
+
 ;; -------------------------------------------------------------------------------- API
 (defun dired-annotator-show-icons ()
   "Display the note icon on files with notes in dired buffer."
   (interactive)
-  (dired-annotator-hide-icons)
   (setq dired-annotator--icons-shown-p t)
-  (let ((res (dired-annotator--show-icons-in-region (point-min) (point-max))))
-    (message (format "found %d notes looking at %d files in %f seconds" (nth 0 res) (nth 1 res) (nth 2 res)))))
+  (let ((res (dired-annotator--show-icons)))
+    (message (format "found %d notes looking at %d files in %f seconds" (nth 0 res) (nth 1 res) (nth 2 res))))
+  (advice-add 'revert-buffer :around #'dired-annotator--wrapped-revert-buffer)
+  (advice-add 'dired-omit-expunge :after #'dired-annotator--after-omit-expunge))
 
 (defun dired-annotator-hide-icons ()
   "Remove all `dired-annotator' overlays."
   (interactive)
   (setq dired-annotator--icons-shown-p nil)
-  (dired-annotator--hide-icons-in-region (point-min) (point-max)))
+  (dired-annotator--hide-icons)
+  (advice-remove 'revert-buffer #'dired-annotator--wrapped-revert-buffer)
+  (advice-remove 'dired-omit-expunge #'dired-annotator--after-omit-expunge))
 
 (defun dired-annotator-edit-note ()
   "create a new annotation and open it, or open an existing"
@@ -354,13 +383,16 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
 (defun dired-annotator-show-note ()
   "display the annotation in a posframe (if existent)"
   (interactive)
-  (when-let* ((absolute-file-name (dired-get-filename))
-              (annotation (dired-annotator--get-annotation-for absolute-file-name))
-              (annotation-abs-file-name (format "%s/%s" dired-annotator-annotations-folder annotation)))
-    (posframe-show (find-file-noselect annotation-abs-file-name) :position (or (dired-annotator--get-note-icon-position) (point)) :lines-truncate t
-                      :width dired-annotator-note-popup-width :height dired-annotator-note-popup-height
-                      :border-color "plum4" :border-width 2 :left-fringe 3 :right-fringe 3 )
-    (add-hook 'pre-command-hook #'dired-annotator--remove-all-posframes)))
+  (if dired-annotator--note-should-not-popup
+      (setq dired-annotator--note-should-not-popup nil)
+    (when-let* ((absolute-file-name (dired-get-filename))
+                (annotation (dired-annotator--get-annotation-for absolute-file-name))
+                (annotation-abs-file-name (format "%s/%s" dired-annotator-annotations-folder annotation)))
+      (setq dired-annotator--note-should-not-popup
+            (posframe-show (find-file-noselect annotation-abs-file-name) :position (or (dired-annotator--get-note-icon-position) (point)) :lines-truncate t
+                           :width dired-annotator-note-popup-width :height dired-annotator-note-popup-height
+                           :border-color "plum4" :border-width 2 :left-fringe 3 :right-fringe 3 ))
+      (add-hook 'pre-command-hook #'dired-annotator--remove-all-posframes))))
 
 ;; -------------------------------------------------------------------------------- dired-subtree integration
 (when (package-installed-p 'dired-subtree)

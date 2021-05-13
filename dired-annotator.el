@@ -61,6 +61,12 @@
   :type 'integer
   :group 'dired-annotator)
 
+(defcustom dired-annotator-modeline
+  '(:eval (dired-annotator-modeline-function))
+  "element that can be added to the modeline"
+  :type 'list
+  :group 'dired-annotator)
+
 (defcustom dired-annotator-after-icon-shown-hook '()
   "list of hooks called whenever the icon for a file is shown.
 each hook is called with two parameters, the absolute file name of the file that has the note
@@ -111,7 +117,7 @@ this allows for trigger show/hide behaviour if the same command is repeated.")
 (defun dired-annotator--hash (file-name _hash-type)
   "get hash of the given type for the file"
   (cond (t ;; (eq hash-type 'head16kmd5)
-           (dired-annotator--head16kmd5 file-name))))
+         (dired-annotator--head16kmd5 file-name))))
 
 (defun dired-annotator--head16kmd5 (file-name)
   "get md5sum of the given FILE-NAME, taking the first SIZE bytes of the file"
@@ -355,70 +361,103 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
   (when (derived-mode-p 'dired-mode)
     (message (format "found %d notes looking at %d files in %f seconds in %s (and open subdirs)" annotation-count file-count time default-directory))))
 
-;; -------------------------------------------------------------------------------- API
-(defun dired-annotator-show-icons ()
-  "Display the note icon on files with notes in dired buffer."
-  (interactive)
-  (setq dired-annotator--icons-shown-p t)
-  (-let [(annotation-count file-count time) (dired-annotator--show-icons)]
-      (run-hook-with-args 'dired-annotator-after-icons-shown-hook annotation-count file-count time))
+(defun dired-annotator--any-buffer-showing-icons? ()
+  "does any buffer exist that currently should show icons in dired?"
+  (--any? (with-current-buffer it
+            (and (derived-mode-p 'dired-mode)
+               dired-annotator--icons-shown-p))
+          (buffer-list)))
+
+(defun dired-annotator--add-integration-advices ()
+  "add all advices for integrating dired-annotator with others"
   (advice-add 'revert-buffer :around #'dired-annotator--wrapped-revert-buffer)
   (when (fboundp #'dired-omit-expunge)
     (advice-add 'dired-omit-expunge :after #'dired-annotator--after-omit-expunge)))
 
-(defun dired-annotator-hide-icons ()
-  "Remove all `dired-annotator' overlays."
-  (interactive)
-  (setq dired-annotator--icons-shown-p nil)
-  (dired-annotator--hide-icons)
+(defun dired-annotator--remove-integration-advices ()
+  "remove all integration advices of dired-annotator with others"
   (advice-remove 'revert-buffer #'dired-annotator--wrapped-revert-buffer)
   (when (fboundp #'dired-omit-expunge)
     (advice-remove 'dired-omit-expunge #'dired-annotator--after-omit-expunge)))
 
+;; -------------------------------------------------------------------------------- API
+(defun dired-annotator-show-icons ()
+  "Display the note icon on files with notes in dired buffer."
+  (interactive)
+  (if (not (derived-mode-p 'dired-mode))
+      (message "only available in dired buffers")
+    (-let [(annotation-count file-count time) (dired-annotator--show-icons)]
+      (run-hook-with-args 'dired-annotator-after-icons-shown-hook annotation-count file-count time))
+    (unless (dired-annotator--any-buffer-showing-icons?)
+      (when dired-annotator-modeline
+        (setq global-mode-string (append global-mode-string (list dired-annotator-modeline)))
+        (force-mode-line-update t))
+      (dired-annotator--add-integration-advices))
+    (setq dired-annotator--icons-shown-p t)))
+
+(defun dired-annotator-hide-icons ()
+  "Remove all `dired-annotator' overlays."
+  (interactive)
+  (if (not (derived-mode-p 'dired-mode))
+      (message "only available in dired buffers")
+    (setq dired-annotator--icons-shown-p nil)
+    (dired-annotator--hide-icons)
+    (unless (dired-annotator--any-buffer-showing-icons?)
+      (when dired-annotator-modeline
+        (setq global-mode-string (remove dired-annotator-modeline global-mode-string))
+        (force-mode-line-update t))
+      (dired-annotator--remove-integration-advices))))
+
 (defun dired-annotator-edit-note ()
   "create a new annotation and open it, or open an existing"
   (interactive)
-  (let* ((absolute-file-name (dired-get-filename))
-         (annotation (or (dired-annotator--get-annotation-for absolute-file-name)
-                        (when-let* ((new-annotation
-                                     (dired-annotator--create-annotation
-                                      absolute-file-name
-                                      (intern (completing-read "pinning-mode: " dired-annotator--pinning-modes)))))
-                          (when dired-annotator--icons-shown-p (dired-annotator--add-note-icon-to-line))
-                          new-annotation)))
-         (annotation-file-name (format "%s/%s" dired-annotator-annotations-folder annotation)))
-    (when-let ((fb (get-file-buffer annotation-file-name)))
-      (kill-buffer fb))
-    (find-file annotation-file-name)
-    (when (= (point-min) (point))
-      (search-forward "some notes" nil t))))
+  (if (not (derived-mode-p 'dired-mode))
+      (message "only available in dired buffers")
+    (let* ((absolute-file-name (dired-get-filename))
+           (annotation (or (dired-annotator--get-annotation-for absolute-file-name)
+                          (when-let* ((new-annotation
+                                       (dired-annotator--create-annotation
+                                        absolute-file-name
+                                        (intern (completing-read "pinning-mode: " dired-annotator--pinning-modes)))))
+                            (when dired-annotator--icons-shown-p (dired-annotator--add-note-icon-to-line))
+                            new-annotation)))
+           (annotation-file-name (format "%s/%s" dired-annotator-annotations-folder annotation)))
+      (when-let ((fb (get-file-buffer annotation-file-name)))
+        (kill-buffer fb))
+      (find-file annotation-file-name)
+      (when (= (point-min) (point))
+        (search-forward "some notes" nil t)))))
 
 (defun dired-annotator-delete-note ()
   "delete an existing annotation (if present)"
   (interactive)
-  (when-let* ((annotated-file-name (dired-get-filename))
-              (annotation (dired-annotator--get-annotation-for annotated-file-name))
-              (annotation-file-name (dired-annotator--to-abs-file annotation)))
-    (when (yes-or-no-p "Really delete this annotation? ")
-      (when-let ((fb (get-file-buffer annotation-file-name)))
-        (kill-buffer fb))
-      (dired-annotator--remove-note-icon-from-line)
-      (dired-annotator--unhash-file (dired-annotator--hash annotated-file-name dired-annotator--hash-mode) annotated-file-name)
-      (delete-file annotation-file-name))))
+  (if (not (derived-mode-p 'dired-mode))
+      (message "only available in dired buffers")
+    (when-let* ((annotated-file-name (dired-get-filename))
+                (annotation (dired-annotator--get-annotation-for annotated-file-name))
+                (annotation-file-name (dired-annotator--to-abs-file annotation)))
+      (when (yes-or-no-p "Really delete this annotation? ")
+        (when-let ((fb (get-file-buffer annotation-file-name)))
+          (kill-buffer fb))
+        (dired-annotator--remove-note-icon-from-line)
+        (dired-annotator--unhash-file (dired-annotator--hash annotated-file-name dired-annotator--hash-mode) annotated-file-name)
+        (delete-file annotation-file-name)))))
 
 (defun dired-annotator-show-note ()
   "display the annotation in a posframe (if existent)"
   (interactive)
-  (if dired-annotator--note-should-not-popup
-      (setq dired-annotator--note-should-not-popup nil)
-    (when-let* ((absolute-file-name (dired-get-filename))
-                (annotation (dired-annotator--get-annotation-for absolute-file-name))
-                (annotation-abs-file-name (format "%s/%s" dired-annotator-annotations-folder annotation)))
-      (setq dired-annotator--note-should-not-popup
-            (posframe-show (find-file-noselect annotation-abs-file-name) :position (or (dired-annotator--get-note-icon-position) (point)) :lines-truncate t
-                           :width dired-annotator-note-popup-width :height dired-annotator-note-popup-height
-                           :border-color "plum4" :border-width 2 :left-fringe 3 :right-fringe 3 ))
-      (add-hook 'pre-command-hook #'dired-annotator--remove-all-posframes))))
+  (if (not (derived-mode-p 'dired-mode))
+      (message "only available in dired buffers")
+    (if dired-annotator--note-should-not-popup
+        (setq dired-annotator--note-should-not-popup nil)
+      (when-let* ((absolute-file-name (dired-get-filename))
+                  (annotation (dired-annotator--get-annotation-for absolute-file-name))
+                  (annotation-abs-file-name (format "%s/%s" dired-annotator-annotations-folder annotation)))
+        (setq dired-annotator--note-should-not-popup
+              (posframe-show (find-file-noselect annotation-abs-file-name) :position (or (dired-annotator--get-note-icon-position) (point)) :lines-truncate t
+                             :width dired-annotator-note-popup-width :height dired-annotator-note-popup-height
+                             :border-color "plum4" :border-width 2 :left-fringe 3 :right-fringe 3 ))
+        (add-hook 'pre-command-hook #'dired-annotator--remove-all-posframes)))))
 
 ;; -------------------------------------------------------------------------------- dired-subtree integration
 (when (package-installed-p 'dired-subtree)
@@ -444,6 +483,13 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
 
       (when (boundp 'dired-subtree-after-remove-hook)
         (add-hook 'dired-subtree-after-remove-hook #'dired-annotator--subtree--cleanup-icons-after-fold)))))
+
+
+(defun dired-annotator-modeline-function ()
+  "indicator, whether notes should be displayed or not"
+  (concat " " (if dired-annotator--icons-shown-p
+                  dired-annotator-note-icon
+                "-")))
 
 ;; --------------------------------------------------------------------------------
 (when (file-directory-p dired-annotator-annotations-folder)

@@ -1,0 +1,62 @@
+#+title: dired-annotator
+
+Keep notes to files in dired.
+
+* General ideas
+
+  This package will either use hashes or absolute file names of files to associate org notes with regular files. Whereas hashes will enable
+  to identify files that may have been moved but did not change, the absolute file name will identify files that changed but did not move.
+
+  When add a note to a file the identification method (hash or absolute file name) is selected. Currently there is no way to change this
+  easily afterwards.
+
+  All notes are kept as org files within a single folder.
+
+  It is integrated with dired. Files that have associated note files will be annotated in dired (e.g. with a document symbol). This can be
+  switched on and off. The note can be previewed with a posframe opening the note.
+
+  Since getting the hash of large folders takes some time, default is that nothing is displayed. Switching it on, all
+  file hashes are computed and each file is checked whether a note is available for that file. Those files with associated note files will
+  be marked with the configured icon.
+
+  It also is integrated with dired-subtree. When unfolding trees while notes should be displayed, all additional files displayed will be
+  checked. Folding will then remove those icons alongside the subtree.
+
+* Installation
+
+  Since this currently is no package available on gnu, non-gnu nor melpa, clone the repository
+  #+begin_src sh
+    git clone https://github.com/gunther-bachmann/emacs-dired-annotator
+  #+end_src
+
+  and add this to your init file. Please adjust the load-path to the folder into which the project was cloned.
+  #+begin_src emacs-lisp
+    (use-package dired-annotator
+      :load-path "~/repo/emacs-dired-annotator"
+      :custom (dired-annotator-note-icon (all-the-icons-faicon "sticky-note"))
+      :bind (:map dired-mode-map
+                  ("C-c a s" . #'dired-annotator-show-icons)
+                  ("C-c a h" . #'dired-annotator-hide-icons)
+                  ("C-c a k" . #'dired-annotator-delete-note)
+                  ("C-c a o" . #'dired-annotator-edit-note)
+                  ("C-c a e" . #'dired-annotator-edit-note)
+                  ("C-c a a" . #'dired-annotator-show-note)
+                  ("'" . #'dired-annotator-show-note)))
+  #+end_src
+
+  Feel free to use different keybindings and customizations (see ~M-x customize-group~ for ~dired-annotator~).
+
+  Make sure to have required packages installed. Currently these are:
+  - ~simple~ (built in)
+  - ~uuid~ ([[https://github.com/nicferrier/emacs-uuid][repo]])
+  - ~posframe~ ([[https://github.com/tumashu/posframe][repo]])
+  - ~dired~ (built in)
+  - ~dash~ ([[https://github.com/magnars/dash.el][repo]])
+
+* open issues/todos
+  - idea: how to change pinning mode for files ?
+  - BUG: make sure that posframe is displayed over x-windows (parent frame = 0 + heed multi screen offset)
+  - BUG: make sure that reverting buffer cleans up overlays
+  - TODO: provide function to copy annotation file name into kill ring
+  - idea: provide function to dired into annotation dir with point at current note
+  - TODO: add testing

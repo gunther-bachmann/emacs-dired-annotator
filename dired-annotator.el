@@ -61,6 +61,26 @@
   :type 'integer
   :group 'dired-annotator)
 
+(defcustom dired-annotator-after-icon-shown-hook '()
+  "list of hooks called whenever the icon for a file is shown.
+each hook is called with two parameters, the absolute file name of the file that has the note
+and the annotation information itself."
+  :type 'hook
+  :group 'dired-annotator)
+
+(defcustom dired-annotator-after-icons-shown-hook #'dired-annotator--report-collection-stats
+  "list of hooks called after new icons are shown.
+each hook is called with three parameters:
+the number of annotations found
+the time it took to collect the annotations"
+  :type 'hook
+  :group 'dired-annotator)
+
+(defcustom dired-annotator-after-icons-removed-hook '()
+  "list of hooks called after icons are removed"
+  :type 'hook
+  :group 'dired-annotator)
+
 ;; internal only
 (defvar dired-annotator--pinning-modes '(immutable-file immutable-location) "list of symbols used as pinning-mode")
 (defvar dired-annotator--md5-2-annotation (make-hash-table :test 'equal) "hash from md5 to annotation file")
@@ -267,7 +287,8 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
   (save-restriction
     (widen)
     (mapc #'delete-overlay
-          (dired-annotator--overlays-in beg end))))
+          (dired-annotator--overlays-in beg end))
+    (run-hooks 'dired-annotator-after-icons-removed-hook)))
 
 (defun dired-annotator--add-overlay (pos string)
   "Add dired annotator overlay to display STRING at POS."
@@ -290,17 +311,11 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
                              (not-directory (not (file-directory-p file)))
                              (annotation (dired-annotator--get-annotation-for file)))
                    (dired-annotator--add-note-icon-to-line)
+                   (run-hook-with-args 'dired-annotator-after-icon-shown-hook file annotation)
                    (incf annotation-count)
                    (beginning-of-line)))
                (forward-line 1))))))
     (list annotation-count file-count time)))
-
-(defun dired-annotator--hide-icons-in-region (start end)
-  "hide all dired annotator icons in the given region"
-  (save-restriction
-    (widen)
-    (mapc #'delete-overlay
-          (dired-annotator--overlays-in start end))))
 
 (defun dired-annotator--get-note-icon-position ()
   "get the note icon position within the given line (or nil if not found)"
@@ -315,31 +330,41 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
   (apply orig-func params)
   (dired-annotator--update-icon-display))
 
-(defun dired-annotator--after-omit-expunge (&rest params)
+(defun dired-annotator--after-omit-expunge (&rest _params)
+  "update icon display after omit expunged files"
   (dired-annotator--update-icon-display))
 
 (defun dired-annotator--update-icon-display ()
+  "either show or hide the icons for the whole buffer, depending on buffer local variable DIRED-ANNOTATOR--ICONS-SHOWN-P"
   (when (derived-mode-p 'dired-mode)
     (if dired-annotator--icons-shown-p
         (dired-annotator--show-icons)
       (dired-annotator--hide-icons))))
 
 (defun dired-annotator--hide-icons ()
-  (dired-annotator--hide-icons-in-region (point-min) (point-max)))
+  "hide all icons in the current buffr"
+  (dired-annotator--delete-overlay-between (point-min) (point-max)))
 
 (defun dired-annotator--show-icons ()
+  "show all icons in the given buffer, if file has a note"
   (dired-annotator--hide-icons)
   (dired-annotator--show-icons-in-region (point-min) (point-max)))
+
+(defun dired-annotator--report-collection-stats (annotation-count file-count time)
+  "hook to inform about the stats collected during annotation collection"
+  (when (derived-mode-p 'dired-mode)
+    (message (format "found %d notes looking at %d files in %f seconds in %s (and open subdirs)" annotation-count file-count time default-directory))))
 
 ;; -------------------------------------------------------------------------------- API
 (defun dired-annotator-show-icons ()
   "Display the note icon on files with notes in dired buffer."
   (interactive)
   (setq dired-annotator--icons-shown-p t)
-  (let ((res (dired-annotator--show-icons)))
-    (message (format "found %d notes looking at %d files in %f seconds" (nth 0 res) (nth 1 res) (nth 2 res))))
+  (-let [(annotation-count file-count time) (dired-annotator--show-icons)]
+      (run-hook-with-args 'dired-annotator-after-icons-shown-hook annotation-count file-count time))
   (advice-add 'revert-buffer :around #'dired-annotator--wrapped-revert-buffer)
-  (advice-add 'dired-omit-expunge :after #'dired-annotator--after-omit-expunge))
+  (when (fboundp #'dired-omit-expunge)
+    (advice-add 'dired-omit-expunge :after #'dired-annotator--after-omit-expunge)))
 
 (defun dired-annotator-hide-icons ()
   "Remove all `dired-annotator' overlays."
@@ -347,7 +372,8 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
   (setq dired-annotator--icons-shown-p nil)
   (dired-annotator--hide-icons)
   (advice-remove 'revert-buffer #'dired-annotator--wrapped-revert-buffer)
-  (advice-remove 'dired-omit-expunge #'dired-annotator--after-omit-expunge))
+  (when (fboundp #'dired-omit-expunge)
+    (advice-remove 'dired-omit-expunge #'dired-annotator--after-omit-expunge)))
 
 (defun dired-annotator-edit-note ()
   "create a new annotation and open it, or open an existing"
@@ -411,8 +437,7 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
             (forward-line)
             (beginning-of-line)
             (let ((end (1+ (point))))
-              (message (format "hide from %d to %d" line end))
-              (dired-annotator--hide-icons-in-region line end)))))
+              (dired-annotator--delete-overlay-between line end)))))
 
       (when (boundp 'dired-subtree-after-insert-hook)
         (add-hook 'dired-subtree-after-insert-hook #'dired-annotator--subtree--possibly-show-for-inserted))

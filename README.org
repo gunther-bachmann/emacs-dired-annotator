@@ -33,7 +33,39 @@ Keep notes to files in dired.
   #+begin_src emacs-lisp
     (use-package dired-annotator
       :load-path "~/repo/emacs-dired-annotator"
-      :custom (dired-annotator-note-icon (all-the-icons-faicon "sticky-note"))
+      :bind (:map dired-mode-map
+                  ("C-c a s" . #'dired-annotator-show-icons)
+                  ("C-c a h" . #'dired-annotator-hide-icons)
+                  ("C-c a k" . #'dired-annotator-delete-note)
+                  ("C-c a o" . #'dired-annotator-edit-note)
+                  ("C-c a e" . #'dired-annotator-edit-note)
+                  ("C-c a a" . #'dired-annotator-show-note)
+                  ("'" . #'dired-annotator-show-note)))
+  #+end_src
+
+  A more complex example configuration using ~all-the-icons~ ([[https://github.com/domtronn/all-the-icons.el][repo]]) and ~posframe~ ([[https://github.com/tumashu/posframe][repo]]):
+  #+begin_src emacs-lisp
+    (use-package dired-annotator
+      :after (posframe all-the-icons)
+      :load-path "~/repo/emacs-dired-annotator"
+      :custom ((dired-annotator-note-icon (all-the-icons-faicon "sticky-note"))
+               (dired-annotator-annotations-folder (expand-file-name "~/documents/annotations"))
+               (dired-annotator-note-popup-hook #'dired-annotator--posframe-note-popup)
+               (dired-annotator-note-popup-remove-hook #'dired-annotator--remove-all-posframes))
+      :init
+      (defun dired-annotator--remove-all-posframes ()
+        "remove all posframes"
+        (unless (eq 'dired-annotator-show-note (lookup-key dired-mode-map (this-single-command-keys)))
+          (setq dired-annotator--note-should-not-popup nil))
+        (ignore-errors
+          (posframe-hide-all)))
+
+      (defun dired-annotator--posframe-note-popup (position annotation-file)
+        (setq dired-annotator--note-should-not-popup t) ;; make sure next key pressed will not open note (not even in case of ')
+        (posframe-show (find-file-noselect annotation-file) :position position :lines-truncate t
+                       :width dired-annotator-note-popup-width :height dired-annotator-note-popup-height
+                       :border-color "plum4" :border-width 2 :left-fringe 3 :right-fringe 3 ))
+
       :bind (:map dired-mode-map
                   ("C-c a s" . #'dired-annotator-show-icons)
                   ("C-c a h" . #'dired-annotator-hide-icons)
@@ -49,7 +81,6 @@ Keep notes to files in dired.
   Make sure to have required packages installed. Currently these are:
   - ~simple~ (built in)
   - ~uuid~ ([[https://github.com/nicferrier/emacs-uuid][repo]])
-  - ~posframe~ ([[https://github.com/tumashu/posframe][repo]])
   - ~dired~ (built in)
   - ~dash~ ([[https://github.com/magnars/dash.el][repo]])
 

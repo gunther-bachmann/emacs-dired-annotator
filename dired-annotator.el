@@ -50,19 +50,9 @@
   :type '(plist)
   :group 'dired-annotator)
 
-(defcustom dired-annotator-note-popup-width 56
-  "width of the note that pops up"
-  :type 'integer
-  :group 'dired-annotator)
-
-(defcustom dired-annotator-note-popup-height 40
-  "max height of the note that pops up"
-  :type 'integer
-  :group 'dired-annotator)
-
 (defcustom dired-annotator-modeline
   '(:eval (dired-annotator-modeline-function))
-  "element that can be added to the modeline"
+  "element that is added to the modeline"
   :type 'list
   :group 'dired-annotator)
 
@@ -77,6 +67,7 @@ and the annotation information itself."
   "list of hooks called after new icons are shown.
 each hook is called with three parameters:
 the number of annotations found
+the number of files checked
 the time it took to collect the annotations"
   :type 'hook
   :group 'dired-annotator)
@@ -88,7 +79,7 @@ the time it took to collect the annotations"
 
 (defcustom dired-annotator-note-popup-hook #'dired-annotator--popup-note
   "called to open an annotation.
-it gets passed: pos of note (icon), annotation info"
+it gets passed: pos of note (icon), absolute file name of annotation"
   :type 'hook
   :group 'dired-annotator)
 

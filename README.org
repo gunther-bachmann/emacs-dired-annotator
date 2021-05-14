@@ -56,6 +56,9 @@ Keep notes to files in dired.
                (dired-annotator-note-popup-hook #'dired-annotator--posframe-note-popup)
                (dired-annotator-note-popup-remove-hook #'dired-annotator--remove-all-posframes))
       :init
+      (defconst dired-annotator-note-popup-width 56 "width of the note that pops up")
+      (defconst dired-annotator-note-popup-height 40 "max height of the note that pops up")
+
       (defun dired-annotator--remove-all-posframes ()
         "remove all posframes"
         (unless (eq 'dired-annotator-show-note (lookup-key dired-mode-map (this-single-command-keys)))

@@ -4,23 +4,26 @@ Keep notes to files in dired.
 
 * General ideas
 
-  This package will either use hashes or absolute file names of files to associate org notes with regular files. Whereas hashes will enable
-  to identify files that may have been moved but did not change, the absolute file name will identify files that changed but did not move.
+  This package will either use hashes or absolute file names to associate org notes with regular files. Whereas hashes will enable to
+  identify files that may have been moved but did not change, the absolute file name will identify files that changed but did not move.
 
-  When add a note to a file the identification method (hash or absolute file name) is selected. Currently there is no way to change this
+  When adding a note to a file, the identification method (hash or absolute file name) is selected. Currently there is no way to change this
   easily afterwards.
 
   All notes are kept as org files within a single folder.
 
   It is integrated with dired. Files that have associated note files will be annotated in dired (e.g. with a document symbol). This can be
-  switched on and off. The note can be previewed with a posframe opening the note.
+  switched on and off. The note can be viewed (e.g. with a posframe) opening the note.
 
-  Since getting the hash of large folders takes some time, default is that nothing is displayed. Switching it on, all
+  Since getting the hash of folders with a large number of files takes some time, default is that nothing is displayed. Switching it on, all
   file hashes are computed and each file is checked whether a note is available for that file. Those files with associated note files will
   be marked with the configured icon.
 
-  It also is integrated with dired-subtree. When unfolding trees while notes should be displayed, all additional files displayed will be
-  checked. Folding will then remove those icons alongside the subtree.
+  It also is integrated with ~dired-subtree~ ([[https://github.com/Fuco1/dired-hacks][repo]]). When unfolding trees while notes should be displayed, all additional files displayed will
+  be checked. Folding will then remove those icons alongside the subtree.
+
+  The integration with ~dired-sidebar~ ([[https://github.com/jojojames/dired-sidebar][repo]]) is somewhat limited, since tracking changes in the sidebar will toggle reruns of the hashing of
+  the whole folder (and open subfolders) which might take a while. This cannot be prevented at the moment.
 
 * Installation
 
@@ -84,8 +87,24 @@ Keep notes to files in dired.
   - ~dired~ (built in)
   - ~dash~ ([[https://github.com/magnars/dash.el][repo]])
 
+* screen shots
+** dired buffer with some notes
+   [[file:screenshots/dired-annotator.dired-with-note.png]]
+** dired buffer with note popup
+   [[file:screenshots/dired-annotator.popup-note.png]]
+** integration with dired subtree
+   [[file:screenshots/dired-annotator.subtree.png]]
+** integration with dired sidebar
+   [[file:screenshots/dired-annotator.sidebar.png]]
+** create note
+   [[file:screenshots/dired-annotator.create.png]]
+** update note
+   [[file:screenshots/dired-annotator.create2.png]]
+** delete note
+   [[file:screenshots/dired-annotator.delete.png]]
 * open issues/todos
   - idea: how to change pinning mode for files ?
   - TODO: provide function to copy annotation file name into kill ring
   - idea: provide function to dired into annotation dir with point at current note
   - TODO: add testing
+  - TODO: prevent hashing reruns in dired sidebar (because of tracking refreshes)

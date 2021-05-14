@@ -86,8 +86,6 @@ Keep notes to files in dired.
 
 * open issues/todos
   - idea: how to change pinning mode for files ?
-  - BUG: make sure that posframe is displayed over x-windows (parent frame = 0 + heed multi screen offset)
-  - BUG: make sure that reverting buffer cleans up overlays
   - TODO: provide function to copy annotation file name into kill ring
   - idea: provide function to dired into annotation dir with point at current note
   - TODO: add testing

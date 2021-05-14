@@ -496,9 +496,11 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
 
 (defun dired-annotator-modeline-function ()
   "indicator, whether notes should be displayed or not"
-  (concat " " (if dired-annotator--icons-shown-p
-                  dired-annotator-note-icon
-                "-")))
+  (if (derived-mode-p 'dired-mode)
+    (concat " " (if dired-annotator--icons-shown-p
+                    dired-annotator-note-icon
+                  "-"))
+    ""))
 
 ;; --------------------------------------------------------------------------------
 (when (file-directory-p dired-annotator-annotations-folder)

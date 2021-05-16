@@ -55,6 +55,7 @@ Keep notes to files in dired.
                (dired-annotator-annotations-folder (expand-file-name "~/documents/annotations"))
                (dired-annotator-note-popup-hook #'dired-annotator--posframe-note-popup)
                (dired-annotator-note-popup-remove-hook #'dired-annotator--remove-all-posframes))
+      :hook (dired-mode . dired-annotator-check-dir-local-show)
       :init
       (defconst dired-annotator-note-popup-width 56 "width of the note that pops up")
       (defconst dired-annotator-note-popup-height 40 "max height of the note that pops up")
@@ -84,13 +85,19 @@ Keep notes to files in dired.
 
   Feel free to use different keybindings and customizations (see ~M-x customize-group~ for ~dired-annotator~).
 
+  To automatically show the notes icons in a dired folder, add the following to your ~.dir-locals.el~ in that folder:
+  #+begin_src emacs-lisp
+    ((dired-mode . ((dired-annotator-show . t))))
+  #+end_src
+  and configure to run ~dired-annotator-check-dir-local-show~ when entering dired-mode (see hook configuration).
+
   Make sure to have required packages installed. Currently these are:
   - ~simple~ (built in)
   - ~uuid~ ([[https://github.com/nicferrier/emacs-uuid][repo]])
   - ~dired~ (built in)
   - ~dash~ ([[https://github.com/magnars/dash.el][repo]])
 
-* screen shots
+* Screen shots
 ** dired buffer with some notes
    [[file:screenshots/dired-annotator.dired-with-note.png]]
 ** dired buffer with note popup
@@ -105,9 +112,11 @@ Keep notes to files in dired.
    [[file:screenshots/dired-annotator.create2.png]]
 ** delete note
    [[file:screenshots/dired-annotator.delete.png]]
-* open issues/todos
+* Open issues/todos
   - idea: how to change pinning mode for files ?
   - TODO: provide function to copy annotation file name into kill ring
   - idea: provide function to dired into annotation dir with point at current note
   - TODO: add testing
   - TODO: prevent hashing reruns in dired sidebar (because of tracking refreshes)
+  - TODO: cleanup notes in subdirectories (e.g. when deleting subdirectories)
+  - TODO: garbage collect dangling notes (probably only feasable for file name fixed notes)

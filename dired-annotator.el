@@ -384,6 +384,10 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
     (view-buffer-other-window annotation-buffer)))
 
 ;; -------------------------------------------------------------------------------- API
+(defun dired-annotator-check-dir-local-show ()
+  (when (bound-and-true-p dired-annotator-show)
+    (dired-annotator-show-icons)))
+
 (defun dired-annotator-show-icons ()
   "Display the note icon on files with notes in dired buffer."
   (interactive)

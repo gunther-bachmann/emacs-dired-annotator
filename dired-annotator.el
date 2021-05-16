@@ -95,6 +95,9 @@ it gets passed: pos of note (icon), absolute file name of annotation"
 
 (defvar dired-annotator--hash-mode 'head16kmd5 "currently configured hash mode")
 
+(defvar dired-annotator--hash-2-annotation nil "hashmap mapping file hash to annotation")
+(defvar dired-annotator--filepath-2-annotation nil "hashmap mapping filepath to annotation")
+
 (defvar-local dired-annotator--icons-shown-p nil "are icons currently shown in the dired buffer")
 (defvar-local dired-annotator--note-should-not-popup nil
   "note should not popup again if show note is triggered.
@@ -203,7 +206,7 @@ this allows for trigger show/hide behaviour if the same command is repeated.")
 (defun dired-annotator--load-annotation-info-from-folder ()
   "read all annotation files from the configured folder and put them in a hash along with the file-information stored with it"
   (setq dired-annotator--hash-2-annotation (make-hash-table :test 'equal))
-  (setq dired-annotator--fiepath-2-annotation (make-hash-table :test 'equal))
+  (setq dired-annotator--filepath-2-annotation (make-hash-table :test 'equal))
   (-each (directory-files dired-annotator-annotations-folder nil ".*\.org")
     (lambda (annotation-file-name)
       (ignore-errors

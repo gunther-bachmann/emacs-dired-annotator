@@ -103,6 +103,8 @@ it gets passed: pos of note (icon), absolute file name of annotation"
   "note should not popup again if show note is triggered.
 this allows for trigger show/hide behaviour if the same command is repeated.")
 
+(defvar-local dired-annotator-show nil "variable to be set via .dir-locals.el")
+
 ;; --------------------------------------------------------------------------------
 (unless (file-directory-p dired-annotator-annotations-folder)
   (warn (format "dired-annotator: folder for notes does not exist (%s)" dired-annotator-annotations-folder)))
@@ -466,19 +468,42 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
         (run-hook-with-args 'dired-annotator-note-popup-hook (or (dired-annotator--get-note-icon-position) (point)) annotation-abs-file-name)
         (add-hook 'pre-command-hook #'dired-annotator--remove-note-popup)))))
 
+(defmacro dired-annotator--with-default-directory (dir &rest body)
+  (declare (indent 1) (debug (form body)))
+  `(when-let ((default-directory ,dir))
+     ,@body))
+
 ;; -------------------------------------------------------------------------------- dired-subtree integration
 (when (package-installed-p 'dired-subtree)
   (eval-after-load 'dired-subtree
     (progn
       (defun dired-annotator--subtree--possibly-show-for-inserted ()
         "if currently showing icons, try to collect information for inserted subtree"
-        (when dired-annotator--icons-shown-p
-          (let ((ov (dired-subtree--get-ov)))
-            (dired-annotator--show-icons-in-region (overlay-start ov) (overlay-end ov)))))
+        (when-let* ((filename (ignore-errors (dired-get-filename)))
+                    (foldername (if (file-directory-p filename)
+                                    (format "%s/../" filename)
+                                  (file-name-directory filename)))
+                    (folder (expand-file-name foldername)))
+          (dired-annotator--with-default-directory
+              folder
+            (hack-dir-local-variables) ;; don't apply, just collect
+            (when-let ((found (--find (eq 'dired-annotator-show (car it)) dir-local-variables-alist)))
+              (setq dired-annotator-show (cdr found))))
+          (when (or (bound-and-true-p dired-annotator-show)
+                   (and (not (boundp dired-annotator-show))
+                      dired-annotator--icons-shown-p))
+            (let ((ov (dired-subtree--get-ov)))
+              (dired-annotator--show-icons-in-region (overlay-start ov) (overlay-end ov))))))
 
       (defun dired-annotator--subtree--cleanup-icons-after-fold ()
         "remove any remaining icons after dired subtree is folded"
         (save-restriction
+          (setq dir-local-variables-alist
+		(assq-delete-all 'dired-annotator-show dir-local-variables-alist))
+          (hack-dir-local-variables) ;; don't apply, just collect
+          (if-let ((found (--find (eq 'dired-annotator-show (car it)) dir-local-variables-alist)))
+              (setq dired-annotator-show (cdr found))
+            (setq dired-annotator-show nil))
           (let ((line (point)))
             (forward-line)
             (beginning-of-line)

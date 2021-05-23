@@ -393,7 +393,20 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
   (let ((annotation-buffer (find-file-noselect annotation-filename)))
     (view-buffer-other-window annotation-buffer)))
 
+(defmacro dired-annotator--with-default-directory (dir &rest body)
+  (declare (indent 1) (debug (form body)))
+  `(when-let ((default-directory ,dir))
+     ,@body))
+
 ;; -------------------------------------------------------------------------------- API
+(defun dired-annotator-modeline-function ()
+  "indicator, whether notes should be displayed or not"
+  (if (derived-mode-p 'dired-mode)
+    (concat " " (if dired-annotator--icons-shown-p
+                    dired-annotator-note-icon
+                  "-"))
+    ""))
+
 (defun dired-annotator-check-dir-local-show ()
   (when (bound-and-true-p dired-annotator-show)
     (dired-annotator-show-icons)))
@@ -476,10 +489,6 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
         (run-hook-with-args 'dired-annotator-note-popup-hook (or (dired-annotator--get-note-icon-position) (point)) annotation-abs-file-name)
         (add-hook 'pre-command-hook #'dired-annotator--remove-note-popup)))))
 
-(defmacro dired-annotator--with-default-directory (dir &rest body)
-  (declare (indent 1) (debug (form body)))
-  `(when-let ((default-directory ,dir))
-     ,@body))
 (defun dired-annotator-reload-annotation-info ()
   "reload annotation information from disk and adjust visible icons accordingly"
   (interactive)
@@ -532,15 +541,6 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
 
       (when (boundp 'dired-subtree-after-remove-hook)
         (add-hook 'dired-subtree-after-remove-hook #'dired-annotator--subtree--cleanup-icons-after-fold)))))
-
-
-(defun dired-annotator-modeline-function ()
-  "indicator, whether notes should be displayed or not"
-  (if (derived-mode-p 'dired-mode)
-    (concat " " (if dired-annotator--icons-shown-p
-                    dired-annotator-note-icon
-                  "-"))
-    ""))
 
 ;; --------------------------------------------------------------------------------
 (when (file-directory-p dired-annotator-annotations-folder)

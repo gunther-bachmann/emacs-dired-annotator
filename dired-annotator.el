@@ -88,6 +88,11 @@ it gets passed: pos of note (icon), absolute file name of annotation"
   :type 'hook
   :group 'dired-annotator)
 
+(defcustom dired-annotator-note-fill-column 54
+  "set fill column of the annotation to this value"
+  :type 'number
+  :group 'dired-annotator)
+
 ;; -------------------------------------------------------------------------------- internal only
 (defvar dired-annotator--pinning-modes '(immutable-file immutable-location) "list of symbols used as pinning-mode")
 (defvar dired-annotator--md5-2-annotation (make-hash-table :test 'equal) "hash from md5 to annotation file")
@@ -437,6 +442,8 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
       (when-let ((fb (get-file-buffer annotation-file-name)))
         (kill-buffer fb))
       (find-file annotation-file-name)
+      (when (integerp dired-annotator-note-fill-column)
+        (setq fill-column dired-annotator-note-fill-column))
       (when (= (point-min) (point))
         (search-forward "some notes" nil t)))))
 

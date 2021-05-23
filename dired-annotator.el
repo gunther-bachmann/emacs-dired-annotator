@@ -444,6 +444,7 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
       (find-file annotation-file-name)
       (when (integerp dired-annotator-note-fill-column)
         (setq fill-column dired-annotator-note-fill-column))
+      (org-show-all)
       (when (= (point-min) (point))
         (search-forward "some notes" nil t)))))
 

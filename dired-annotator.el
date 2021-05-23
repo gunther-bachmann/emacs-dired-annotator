@@ -499,6 +499,11 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
           (dired-annotator--show-icons)))
     (message (format "folder for annotations unknown (%s)" dired-annotator-annotations-folder))))
 
+(defun dired-annotator-dired-on-annotation-folder ()
+  "open annotation folder via dired"
+  (interactive)
+  (dired dired-annotator-annotations-folder))
+
 ;; -------------------------------------------------------------------------------- dired-subtree integration
 (when (package-installed-p 'dired-subtree)
   (eval-after-load 'dired-subtree

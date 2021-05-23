@@ -80,6 +80,7 @@ Keep notes to files in dired.
 
       :bind (:map dired-mode-map
                   ("C-c a r" . #'dired-annotator-reload-annotation-info)
+                  ("C-c a d" . #'dired-annotator-dired-on-annotation-folder)
                   ("C-c a s" . #'dired-annotator-show-icons)
                   ("C-c a h" . #'dired-annotator-hide-icons)
                   ("C-c a k" . #'dired-annotator-delete-note)

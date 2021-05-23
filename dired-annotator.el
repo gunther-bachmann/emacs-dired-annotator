@@ -480,6 +480,15 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
   (declare (indent 1) (debug (form body)))
   `(when-let ((default-directory ,dir))
      ,@body))
+(defun dired-annotator-reload-annotation-info ()
+  "reload annotation information from disk and adjust visible icons accordingly"
+  (interactive)
+  (if (file-directory-p dired-annotator-annotations-folder)
+      (progn
+        (dired-annotator--load-annotation-info-from-folder)
+        (when dired-annotator--icons-shown-p
+          (dired-annotator--show-icons)))
+    (message (format "folder for annotations unknown (%s)" dired-annotator-annotations-folder))))
 
 ;; -------------------------------------------------------------------------------- dired-subtree integration
 (when (package-installed-p 'dired-subtree)

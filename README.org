@@ -54,6 +54,7 @@ Keep notes to files in dired.
       :custom ((dired-annotator-note-icon (all-the-icons-faicon "sticky-note"))
                (dired-annotator-annotations-folder (expand-file-name "~/documents/annotations"))
                (dired-annotator-note-popup-hook #'dired-annotator--posframe-note-popup)
+               (dired-annotator-note-fill-column 54) ;; a bit smaller than the popup window
                (dired-annotator-note-popup-remove-hook #'dired-annotator--remove-all-posframes))
       :hook (dired-mode . dired-annotator-check-dir-local-show)
       :init
@@ -68,12 +69,17 @@ Keep notes to files in dired.
           (posframe-hide-all)))
 
       (defun dired-annotator--posframe-note-popup (position annotation-file)
-        (setq dired-annotator--note-should-not-popup t) ;; make sure next key pressed will not open note (not even in case of ')
-        (posframe-show (find-file-noselect annotation-file) :position position :lines-truncate t
-                       :width dired-annotator-note-popup-width :height dired-annotator-note-popup-height
-                       :border-color "plum4" :border-width 2 :left-fringe 3 :right-fringe 3 ))
+        (setq dired-annotator--note-should-not-popup t)
+        (let ((note-buffer (find-file-noselect annotation-file)))
+          (with-current-buffer note-buffer
+            ;; make sure that regardless of org startup visibility, the buffer is fully visible
+            (org-show-all))
+          (posframe-show note-buffer :position position :lines-truncate t
+                         :width dired-annotator-note-popup-width :height dired-annotator-note-popup-height
+                         :border-color "plum4" :border-width 2 :left-fringe 3 :right-fringe 3 )))
 
       :bind (:map dired-mode-map
+                  ("C-c a r" . #'dired-annotator-reload-annotation-info)
                   ("C-c a s" . #'dired-annotator-show-icons)
                   ("C-c a h" . #'dired-annotator-hide-icons)
                   ("C-c a k" . #'dired-annotator-delete-note)

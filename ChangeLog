@@ -1,3 +1,11 @@
-2021-05-13  Gunther Bachmann  <gunther.bachmann@web.de>
+2021-05-23  Gunther Bachmann  <gunther.bachmann@web.de>
+        version 0.0.2
+        * dired-annotator.el: allow posframe customization
+                              toggle visibility of posframe notes
+                              add modeline
+                              allow for dirlocal variable to show notes
+                              integration with dired subtree
 
-	* dired-annotator.el: first public commit
+2021-05-13  Gunther Bachmann  <gunther.bachmann@web.de>
+        version 0.0.1
+        * dired-annotator.el: first public commit

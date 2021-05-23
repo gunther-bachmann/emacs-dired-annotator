@@ -6,7 +6,7 @@
 ;; Maintainer: gunther.bachmann@web.de
 ;; Package: dired-annotator
 ;; Homepage: https://github.com/gunther-bachmann/dired-annotator
-;; Version: 0.0.1
+;; Version: 0.0.2
 ;; Package-Requires: ((emacs "27"))
 ;; Keywords: internal
 

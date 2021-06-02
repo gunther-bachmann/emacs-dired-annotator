@@ -398,6 +398,18 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
   `(when-let ((default-directory ,dir))
      ,@body))
 
+(defun dired-annotator--cleanup-modeline ()
+  "cleanup modeline string"
+  (setq global-mode-string (remove dired-annotator-modeline global-mode-string))
+  (force-mode-line-update t))
+
+(defun dired-annotator--setup-modeline ()
+  "setup modeline string if wanted"
+  (dired-annotator--cleanup-modeline)
+  (when dired-annotator-modeline
+    (setq global-mode-string (append global-mode-string (list dired-annotator-modeline)))
+    (force-mode-line-update t)))
+
 ;; -------------------------------------------------------------------------------- API
 (defun dired-annotator-modeline-function ()
   "indicator, whether notes should be displayed or not"
@@ -419,9 +431,7 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
     (-let [(annotation-count file-count time) (dired-annotator--show-icons)]
       (run-hook-with-args 'dired-annotator-after-icons-shown-hook annotation-count file-count time))
     (unless (dired-annotator--any-buffer-showing-icons?)
-      (when dired-annotator-modeline
-        (setq global-mode-string (append global-mode-string (list dired-annotator-modeline)))
-        (force-mode-line-update t))
+      (dired-annotator--setup-modeline)
       (dired-annotator--add-integration-advices))
     (setq dired-annotator--icons-shown-p t)))
 
@@ -433,9 +443,7 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
     (setq dired-annotator--icons-shown-p nil)
     (dired-annotator--hide-icons)
     (unless (dired-annotator--any-buffer-showing-icons?)
-      (when dired-annotator-modeline
-        (setq global-mode-string (remove dired-annotator-modeline global-mode-string))
-        (force-mode-line-update t))
+      (dired-annotator--cleanup-modeline)
       (dired-annotator--remove-integration-advices))))
 
 (defun dired-annotator-edit-note ()

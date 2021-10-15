@@ -46,10 +46,10 @@ Keep notes to files in dired.
                   ("'" . #'dired-annotator-show-note)))
   #+end_src
 
-  A more complex example configuration using ~all-the-icons~ ([[https://github.com/domtronn/all-the-icons.el][repo]]) and ~posframe~ ([[https://github.com/tumashu/posframe][repo]]):
+  A more complex example configuration using ~all-the-icons~ ([[https://github.com/domtronn/all-the-icons.el][repo]]), ~posframe~ ([[https://github.com/tumashu/posframe][repo]]), ~dired-narrow~ ([[https://github.com/Fuco1/dired-hacks#dired-narrow][repo]]) and ~org-ql~ ([[https://github.com/alphapapa/org-ql][repo]]):
   #+begin_src emacs-lisp
     (use-package dired-annotator
-      :after (posframe all-the-icons)
+      :after (posframe all-the-icons org-ql dired-narrow)
       :load-path "~/repo/emacs-dired-annotator"
       :custom ((dired-annotator-note-icon (all-the-icons-faicon "sticky-note"))
                (dired-annotator-annotations-folder (expand-file-name "~/documents/annotations"))
@@ -87,6 +87,7 @@ Keep notes to files in dired.
                   ("C-c a o" . #'dired-annotator-edit-note)
                   ("C-c a e" . #'dired-annotator-edit-note)
                   ("C-c a a" . #'dired-annotator-show-note)
+                  ("C-c a /" . #'dired-annotator-narrow-on-tag)
                   ("'" . #'dired-annotator-show-note)))
   #+end_src
 

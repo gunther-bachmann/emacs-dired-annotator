@@ -1,4 +1,8 @@
 2021-05-23  Gunther Bachmann  <gunther.bachmann@web.de>
+        version 0.0.3
+        * dired-annotator.el: dired-narrow integration
+
+2021-05-23  Gunther Bachmann  <gunther.bachmann@web.de>
         version 0.0.2
         * dired-annotator.el: allow posframe customization
                               toggle visibility of posframe notes

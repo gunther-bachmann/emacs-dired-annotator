@@ -93,10 +93,30 @@ it gets passed: pos of note (icon), absolute file name of annotation"
   :type 'number
   :group 'dired-annotator)
 
+(defcustom dired-annotator-integrate-with-dired-narrow
+  (and (package-installed-p 'dired-narrow)
+         (package-installed-p 'org-ql))
+  "should annotator integrate with dired narrow?
+
+make sure to have all necessary packages installed"
+  :type 'boolean
+  :group 'dired-annotator)
+
+(defcustom dired-annotator-show-non-tagged-on-narrow t
+  "should files without tag be shown on narrowing?
+
+only valid if integration with dired narrow is activated"
+  :type 'boolean
+  :group 'dired-annotator)
+
+
 ;; -------------------------------------------------------------------------------- internal only
-(defvar dired-annotator--pinning-modes '(immutable-file immutable-location) "list of symbols used as pinning-mode")
-(defvar dired-annotator--md5-2-annotation (make-hash-table :test 'equal) "hash from md5 to annotation file")
-(defvar dired-annotator--filepath-2-annotation (make-hash-table :test 'equal) "hash from complete absolute file path to annotation file")
+(defvar dired-annotator--pinning-modes '(immutable-file immutable-location)
+  "list of symbols used as pinning-mode")
+(defvar dired-annotator--md5-2-annotation (make-hash-table :test 'equal)
+  "hash from md5 to annotation file")
+(defvar dired-annotator--filepath-2-annotation (make-hash-table :test 'equal)
+  "hash from complete absolute file path to annotation file")
 
 (defvar dired-annotator--hash-mode 'head16kmd5 "currently configured hash mode")
 
@@ -133,12 +153,15 @@ this allows for trigger show/hide behaviour if the same command is repeated.")
 (defun dired-annotator--head16kmd5 (file-name)
   "get md5sum of the given FILE-NAME, taking the first SIZE bytes of the file"
   (let ((dumpsize 16384))
-    (shell-command-to-string (format "head -c %d \"%s\" | md5sum | sed -e 's/ *-//g' | tr -d '\n'" dumpsize file-name))))
+    (shell-command-to-string (format "head -c %d \"%s\" | md5sum | sed -e 's/ *-//g' | tr -d '\n'"
+                                     dumpsize file-name))))
 
 (defun dired-annotator--head16kmd5s (directory-name)
   "get a list of pairs of file-name, md5sums of the files in DIRECTORY-NAME, taking the first SIZE bytes of each file"
   (let* ((dumpsize 16384)
-         (dir-result (shell-command-to-string (format "find %s -type f -maxdepth 1 -exec sh -c \"head -c %d \"{}\" 2>/dev/null | md5sum | sed -e 's/ *-//g' | { tr -d '\n'; echo ' \"{}\"' ; } \" \\;" directory-name dumpsize))))
+         (dir-result (shell-command-to-string
+                      (format "find %s -type f -maxdepth 1 -exec sh -c \"head -c %d \"{}\" 2>/dev/null | md5sum | sed -e 's/ *-//g' | { tr -d '\n'; echo ' \"{}\"' ; } \" \\;"
+                              directory-name dumpsize))))
     (--map (list (substring it 33)
                  (substring it 0 32)
                  'head16kmd5)
@@ -211,18 +234,26 @@ this allows for trigger show/hide behaviour if the same command is repeated.")
 ;;         (t nil)))
 
 (defun dired-annotator--load-annotation-info-from-folder ()
-  "read all annotation files from the configured folder and put them in a hash along with the file-information stored with it"
+  "read all annotation files from the configured folder
+and put them in a hash along with the file-information stored with it"
   (setq dired-annotator--hash-2-annotation (make-hash-table :test 'equal))
   (setq dired-annotator--filepath-2-annotation (make-hash-table :test 'equal))
   (-each (directory-files dired-annotator-annotations-folder nil ".*\.org")
     (lambda (annotation-file-name)
       (ignore-errors
-        (--> (format "head -c 512 \"%s/%s\" | grep '^#+property: file-information ' | sed -e 's/#+property: file-information \\(.*\\)/\\1/g'" dired-annotator-annotations-folder annotation-file-name)
-          (shell-command-to-string it)
-          (string-trim it)
-          (read-from-string it)
-          (car it)
-          (dired-annotator--hash-file-information it annotation-file-name))))))
+        (dired-annotator--hash-file-information
+         (dired-annotator--read-fileinformation annotation-file-name)
+         annotation-file-name)))))
+
+(defun dired-annotator--read-fileinformation (annotation-file-name)
+  "read and return the file information structure of the given file"
+  (ignore-errors
+    (--> (format "head -c 512 \"%s/%s\" | grep '^#+property: file-information ' | sed -e 's/#+property: file-information \\(.*\\)/\\1/g'"
+                 dired-annotator-annotations-folder annotation-file-name)
+         (shell-command-to-string it)
+         (string-trim it)
+         (read-from-string it)
+         (car it))))
 
 (defun dired-annotator--unhash-file (hash-key absolute-file-name)
   "remove given keys from hash
@@ -241,7 +272,9 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
                             (dired-annotator--fi-name file-information))
                     annotation-file-name dired-annotator--filepath-2-annotation))
           (t ;; (eq pinning 'immutable-file)
-           (puthash (dired-annotator--fi-hash file-information) annotation-file-name dired-annotator--hash-2-annotation)))))
+           (puthash (dired-annotator--fi-hash file-information)
+                    annotation-file-name
+                    dired-annotator--hash-2-annotation)))))
 
 (defun dired-annotator--create-annotation (absolute-file-name pinning-mode)
   "create a blank annotation for ABSOLUTE-FILE-NAME"
@@ -318,6 +351,7 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
                  (incf file-count)
                  (when-let* ((file (dired-get-filename))
                              (not-directory (not (file-directory-p file)))
+                             (visible (not (get-text-property (line-beginning-position) 'invisible)))
                              (annotation (dired-annotator--get-annotation-for file)))
                    (dired-annotator--add-note-icon-to-line)
                    (run-hook-with-args 'dired-annotator-after-icon-shown-hook file annotation)
@@ -344,7 +378,8 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
   (dired-annotator--update-icon-display))
 
 (defun dired-annotator--update-icon-display ()
-  "either show or hide the icons for the whole buffer, depending on buffer local variable DIRED-ANNOTATOR--ICONS-SHOWN-P"
+  "either show or hide the icons for the whole buffer,
+depending on buffer local variable DIRED-ANNOTATOR--ICONS-SHOWN-P"
   (when (derived-mode-p 'dired-mode)
     (if dired-annotator--icons-shown-p
         (dired-annotator--show-icons)
@@ -362,7 +397,9 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
 (defun dired-annotator--report-collection-stats (annotation-count file-count time)
   "hook to inform about the stats collected during annotation collection"
   (when (derived-mode-p 'dired-mode)
-    (message (format "found %d notes looking at %d files in %f seconds in %s (and open subdirs)" annotation-count file-count time default-directory))))
+    (message
+     (format "found %d notes looking at %d files in %f seconds in %s (and open subdirs)"
+             annotation-count file-count time default-directory))))
 
 (defun dired-annotator--any-buffer-showing-icons? ()
   "does any buffer exist that currently should show icons in dired?"
@@ -409,6 +446,57 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
   (when dired-annotator-modeline
     (setq global-mode-string (append global-mode-string (list dired-annotator-modeline)))
     (force-mode-line-update t)))
+
+;; -------------------------------------------------------------------------------- org tags via org-ql
+(when (package-installed-p 'org-ql)
+  (defun dired-annotator--get-tags-for (absolute-file-name)
+    "get tags of the annotation for the given file"
+    (when-let* ((annotation-file (dired-annotator--get-annotation-for absolute-file-name)))
+      (--map (substring-no-properties it)
+             (car (org-ql-select (concat dired-annotator-annotations-folder "/" annotation-file)
+                    '(tags-all)
+                    :action #'org-get-tags)))))
+
+  (defun dired-annotator--get-all-tags ()
+    "get a unique list of tags that are available in annotated files"
+    (-as-> (org-ql-select (directory-files dired-annotator-annotations-folder t ".*\\.org$")
+                                  '(tags-all)
+                                  :action #'org-get-tags)
+       tags
+       (--mapcat it tags)
+       (--map (substring-no-properties it) tags)
+       (-uniq tags))))
+
+;; -------------------------------------------------------------------------------- dired-narrow integration
+(when dired-annotator-integrate-with-dired-narrow
+
+  (require 'dired-narrow)
+
+  (defun dired-annotator--tag-filter-function (tag)
+    "should the file under cursor be filtered given this TAG?"
+    (if-let ((tags (dired-annotator--get-tags-for
+                    (concat (dired-current-directory)
+                            (dired-utils-get-filename 'no-dir))))) ;; TODO cache tags for file
+        (--find (string-equal tag it) tags)
+      dired-annotator-show-non-tagged-on-narrow))
+
+  (defun dired-annotator--get-tags ()
+    "get tags for current file in dired"
+    (when-let* ((file-name (dired-utils-get-filename 'no-dir))
+                (absolute-file-name (concat (dired-current-directory) file-name)))
+      (dired-annotator--get-tags-for absolute-file-name)))
+
+  (defun dired-annotator--minimal-narrow (filter-function initial-filter)
+    "integrate with dired-narrow
+
+this contains very specific dired-narrow code that might change over time."
+    (setq dired-narrow-filter-function filter-function)
+    (dired-narrow-mode 1)
+    (add-to-invisibility-spec :dired-narrow)
+    (dired-narrow--update initial-filter)
+    (let ((inhibit-read-only t))
+      (dired-narrow--remove-text-with-property :dired-narrow))
+    (funcall dired-narrow-exit-action)))
 
 ;; -------------------------------------------------------------------------------- API
 (defun dired-annotator-modeline-function ()
@@ -511,6 +599,16 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
   "open annotation folder via dired"
   (interactive)
   (dired dired-annotator-annotations-folder))
+
+(when dired-annotator-integrate-with-dired-narrow
+
+  (defun dired-annotator-narrow-on-tag ()
+    "Narrow a dired buffer to the files having annotations with the given tag."
+    (interactive)
+    ;; (dired-annotator--dired-narrow--internal 'dired-annotator--tag-filter-function (completing-read  "tag: " (dired-annotator--get-all-tags) nil t))
+    (dired-annotator--minimal-narrow 'dired-annotator--tag-filter-function (completing-read  "tag: " (dired-annotator--get-all-tags) nil t))
+    (dired-annotator--show-icons)))
+
 
 ;; -------------------------------------------------------------------------------- dired-subtree integration
 (when (package-installed-p 'dired-subtree)

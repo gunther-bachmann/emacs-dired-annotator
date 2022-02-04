@@ -109,7 +109,7 @@ only valid if integration with dired narrow is activated"
   :type 'boolean
   :group 'dired-annotator)
 
-(defcustom dired-annotator-seconds-to-note-buffer-removal (* 10 60) 
+(defcustom dired-annotator-seconds-to-note-buffer-removal (* 5 60)
   "seconds until annotation buffers are removed"
   :type 'number
   :group 'dired-annotator)
@@ -619,24 +619,20 @@ this contains very specific dired-narrow code that might change over time."
   (when dired-annotator-buffer-cleanup-timer
     (cancel-timer dired-annotator-buffer-cleanup-timer))
   (setq dired-annotator-buffer-cleanup-timer
-        (run-at-time (1+ dired-annotator-seconds-to-note-buffer-removal) nil #'dired-annotator-clean-unused-note-buffers)))
+        (run-at-time dired-annotator-seconds-to-note-buffer-removal nil #'dired-annotator-clean-unused-note-buffers)))
 
 (defun dired-annotator-clean-unused-note-buffers ()
-  (let ((ts (format-time-string "%Y-%m-%d %T"))
-        (tm (current-time)))
+  (let ((ts (format-time-string "%Y-%m-%d %T")))
     (dolist (buf (buffer-list))
       (let ((bn (buffer-name buf)))
         (when (buffer-live-p buf)
-          (let* ((bts (with-current-buffer buf buffer-display-time))
-                 (delay (if bts (round (float-time (time-subtract tm bts))) 0)))
-            ;; (message "[%s] `%s' [%s %d]" ts bn delay dired-annotator-seconds-to-note-buffer-removal)
-            (unless (or (get-buffer-process buf)
-                       (and (buffer-file-name buf) (buffer-modified-p buf))
-                       (not (dired-annotator-buffer-is-note-p buf))
-                       (get-buffer-window buf 'visible)
-                       (< delay dired-annotator-seconds-to-note-buffer-removal))
-              (message "[%s] killing `%s'" ts bn)
-              (kill-buffer buf)))))))
+          (message "[%s] `%s'" ts bn)
+          (unless (or (get-buffer-process buf)
+                     (and (buffer-file-name buf) (buffer-modified-p buf))
+                     (not (dired-annotator-buffer-is-note-p buf))
+                     (get-buffer-window buf 'visible))
+            (message "[%s] killing `%s'" ts bn)
+            (kill-buffer buf))))))
   (setq dired-annotator-buffer-cleanup-timer nil))
 
 (defun dired-annotator-buffer-is-note-p (buffer)

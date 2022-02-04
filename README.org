@@ -55,7 +55,8 @@ Keep notes to files in dired.
                (dired-annotator-annotations-folder (expand-file-name "~/documents/annotations"))
                (dired-annotator-note-popup-hook #'dired-annotator--posframe-note-popup)
                (dired-annotator-note-fill-column 54) ;; a bit smaller than the popup window
-               (dired-annotator-note-popup-remove-hook #'dired-annotator--remove-all-posframes))
+               (dired-annotator-note-popup-remove-hook '(dired-annotator-register-buffer-cleanup
+                                                         dired-annotator--remove-all-posframes)))
       :hook (dired-mode . dired-annotator-check-dir-local-show)
       :init
       (defconst dired-annotator-note-popup-width 56 "width of the note that pops up")

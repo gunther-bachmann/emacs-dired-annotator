@@ -1,3 +1,7 @@
+2022-02-04  Gunther Bachmann  <gunther.bachmann@web.de>
+        version 0.0.4
+        * dired-annotator.el: add delayed annotation note buffer removal
+
 2021-05-23  Gunther Bachmann  <gunther.bachmann@web.de>
         version 0.0.3
         * dired-annotator.el: dired-narrow integration

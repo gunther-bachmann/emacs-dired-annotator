@@ -109,6 +109,10 @@ only valid if integration with dired narrow is activated"
   :type 'boolean
   :group 'dired-annotator)
 
+(defcustom dired-annotator-seconds-to-note-buffer-removal (* 10 60) 
+  "seconds until annotation buffers are removed"
+  :type 'number
+  :group 'dired-annotator)
 
 ;; -------------------------------------------------------------------------------- internal only
 (defvar dired-annotator--pinning-modes '(immutable-file immutable-location)
@@ -122,6 +126,7 @@ only valid if integration with dired narrow is activated"
 
 (defvar dired-annotator--hash-2-annotation nil "hashmap mapping file hash to annotation")
 (defvar dired-annotator--filepath-2-annotation nil "hashmap mapping filepath to annotation")
+(defvar dired-annotator-buffer-cleanup-timer nil "timer currently running to cleanup annotation buffers")
 
 (defvar-local dired-annotator--icons-shown-p nil "are icons currently shown in the dired buffer")
 (defvar-local dired-annotator--note-should-not-popup nil
@@ -609,6 +614,35 @@ this contains very specific dired-narrow code that might change over time."
     (dired-annotator--minimal-narrow 'dired-annotator--tag-filter-function (completing-read  "tag: " (dired-annotator--get-all-tags) nil t))
     (dired-annotator--show-icons)))
 
+;; -------------------------------------------------------------------------------- remove open notes after some time
+(defun dired-annotator-register-buffer-cleanup ()
+  (when dired-annotator-buffer-cleanup-timer
+    (cancel-timer dired-annotator-buffer-cleanup-timer))
+  (setq dired-annotator-buffer-cleanup-timer
+        (run-at-time (1+ dired-annotator-seconds-to-note-buffer-removal) nil #'dired-annotator-clean-unused-note-buffers)))
+
+(defun dired-annotator-clean-unused-note-buffers ()
+  (let ((ts (format-time-string "%Y-%m-%d %T"))
+        (tm (current-time)))
+    (dolist (buf (buffer-list))
+      (let ((bn (buffer-name buf)))
+        (when (buffer-live-p buf)
+          (let* ((bts (with-current-buffer buf buffer-display-time))
+                 (delay (if bts (round (float-time (time-subtract tm bts))) 0)))
+            ;; (message "[%s] `%s' [%s %d]" ts bn delay dired-annotator-seconds-to-note-buffer-removal)
+            (unless (or (get-buffer-process buf)
+                       (and (buffer-file-name buf) (buffer-modified-p buf))
+                       (not (dired-annotator-buffer-is-note-p buf))
+                       (get-buffer-window buf 'visible)
+                       (< delay dired-annotator-seconds-to-note-buffer-removal))
+              (message "[%s] killing `%s'" ts bn)
+              (kill-buffer buf)))))))
+  (setq dired-annotator-buffer-cleanup-timer nil))
+
+(defun dired-annotator-buffer-is-note-p (buffer)
+  "is the given buffer an annotation file?" 
+  (when-let ((bn (buffer-file-name buffer)))
+    (string-prefix-p dired-annotator-annotations-folder bn)))
 
 ;; -------------------------------------------------------------------------------- dired-subtree integration
 (when (package-installed-p 'dired-subtree)

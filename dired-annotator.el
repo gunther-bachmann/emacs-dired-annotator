@@ -351,7 +351,7 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
           (measure-time
            (save-excursion
              (goto-char min)
-             (loop-until (>= (point) max)
+             (while (< (point) max)
                (when (dired-move-to-filename nil)
                  (incf file-count)
                  (when-let* ((file (dired-get-filename))

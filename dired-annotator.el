@@ -149,6 +149,13 @@ this allows for trigger show/hide behaviour if the same command is repeated.")
 
 ;; --------------------------------------------------------------------------------
 
+(defmacro measure-time (&rest body)
+  "Measure the time it takes to evaluate BODY and return this in ms."
+  (let ((time-sym (gensym 'time)))
+    `(let (
+           (,time-sym (current-time)))
+       ,@body
+       (float-time (time-since ,time-sym)))))
 
 (defun dired-annotator--hash (file-name _hash-type)
   "get hash of the given type for the file"
@@ -353,14 +360,14 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
              (goto-char min)
              (while (< (point) max)
                (when (dired-move-to-filename nil)
-                 (incf file-count)
+                 (cl-incf file-count)
                  (when-let* ((file (dired-get-filename))
                              (not-directory (not (file-directory-p file)))
                              (visible (not (get-text-property (line-beginning-position) 'invisible)))
                              (annotation (dired-annotator--get-annotation-for file)))
                    (dired-annotator--add-note-icon-to-line)
                    (run-hook-with-args 'dired-annotator-after-icon-shown-hook file annotation)
-                   (incf annotation-count)
+                   (cl-incf annotation-count)
                    (beginning-of-line)))
                (forward-line 1))))))
     (list annotation-count file-count time)))

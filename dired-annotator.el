@@ -175,8 +175,8 @@ this allows for trigger show/hide behaviour if the same command is repeated.")
 (defun dired-annotator--head16kmd5 (file-name)
   "get md5sum of the given FILE-NAME, taking the first SIZE bytes of the file"
   (let ((dumpsize 16384))
-    (shell-command-to-string (format "head -c %d \"%s\" | md5sum | sed -e 's/ *-//g' | tr -d '\n'"
-                                     dumpsize file-name))))
+    (shell-command-to-string (format "head -c %d %s | md5sum | sed -e 's/ *-//g' | tr -d '\n'"
+                                     dumpsize (shell-quote-argument file-name)))))
 
 (defun dired-annotator--head16kmd5s (directory-name)
   "get a list of pairs of file-name, md5sums of the files in DIRECTORY-NAME, 
@@ -184,7 +184,7 @@ taking the first SIZE bytes of each file"
   (let* ((dumpsize 16384)
          (dir-result (shell-command-to-string
                       (format "find %s -type f -maxdepth 1 -exec sh -c \"head -c %d \"{}\" 2>/dev/null | md5sum | sed -e 's/ *-//g' | { tr -d '\n'; echo ' \"{}\"' ; } \" \\;"
-                              directory-name dumpsize))))
+                              (shell-quote-argument directory-name) dumpsize))))
     (--map (list (substring it 33)
                  (substring it 0 32)
                  'head16kmd5)
@@ -269,8 +269,9 @@ and put them in a hash along with the file-information stored with it"
 (defun dired-annotator--read-fileinformation (annotation-file-name)
   "read and return the file information structure of the given file"
   (ignore-errors
-    (--> (format "head -c 512 \"%s/%s\" | grep '^#+property: file-information ' | sed -e 's/#+property: file-information \\(.*\\)/\\1/g'"
-                 dired-annotator-annotations-folder annotation-file-name)
+    (--> (format "head -c 512 %s/%s | grep '^#+property: file-information ' | sed -e 's/#+property: file-information \\(.*\\)/\\1/g'"
+               (shell-quote-argument dired-annotator-annotations-folder)
+               (shell-quote-argument annotation-file-name))
          (shell-command-to-string it)
          (string-trim it)
          (read-from-string it)

@@ -1,3 +1,10 @@
+2022-11-02  Gunther Bachmann  <gunther.bachmann@web.de>
+	version 0.0.5
+	* dired-annotator.el: use shell-quote-argument to pass filenames to shell commands
+	  		      early init of some hash maps
+			      fix some issues when natively compiling
+	* README.org:	      make sure to point out that the default folder for annotations should be set
+
 2022-02-04  Gunther Bachmann  <gunther.bachmann@web.de>
         version 0.0.4
         * dired-annotator.el: add delayed annotation note buffer removal

@@ -58,8 +58,8 @@
 
 (defcustom dired-annotator-after-icon-shown-hook '()
   "list of hooks called whenever the icon for a file is shown.
-each hook is called with two parameters, the absolute file name of the file that has the note
-and the annotation information itself."
+each hook is called with two parameters, the absolute file name of the file that
+has the note and the annotation information itself."
   :type 'hook
   :group 'dired-annotator)
 
@@ -124,12 +124,21 @@ only valid if integration with dired narrow is activated"
 
 (defvar dired-annotator--hash-mode 'head16kmd5 "currently configured hash mode")
 
-(defvar dired-annotator--hash-2-annotation nil "hashmap mapping file hash to annotation")
-(defvar dired-annotator--filepath-2-annotation nil "hashmap mapping filepath to annotation")
-(defvar dired-annotator-buffer-cleanup-timer nil "timer currently running to cleanup annotation buffers")
+(defvar dired-annotator--hash-2-annotation
+  (make-hash-table :test 'equal)
+  "hashmap mapping file hash to annotation")
+(defvar dired-annotator--filepath-2-annotation
+  (make-hash-table :test 'equal)
+  "hashmap mapping filepath to annotation")
+(defvar dired-annotator-buffer-cleanup-timer
+  nil
+  "timer currently running to cleanup annotation buffers")
 
-(defvar-local dired-annotator--icons-shown-p nil "are icons currently shown in the dired buffer")
-(defvar-local dired-annotator--note-should-not-popup nil
+(defvar-local dired-annotator--icons-shown-p
+  nil
+  "are icons currently shown in the dired buffer")
+(defvar-local dired-annotator--note-should-not-popup
+  nil
   "note should not popup again if show note is triggered.
 this allows for trigger show/hide behaviour if the same command is repeated.")
 
@@ -169,7 +178,8 @@ this allows for trigger show/hide behaviour if the same command is repeated.")
                                      dumpsize file-name))))
 
 (defun dired-annotator--head16kmd5s (directory-name)
-  "get a list of pairs of file-name, md5sums of the files in DIRECTORY-NAME, taking the first SIZE bytes of each file"
+  "get a list of pairs of file-name, md5sums of the files in DIRECTORY-NAME, 
+taking the first SIZE bytes of each file"
   (let* ((dumpsize 16384)
          (dir-result (shell-command-to-string
                       (format "find %s -type f -maxdepth 1 -exec sh -c \"head -c %d \"{}\" 2>/dev/null | md5sum | sed -e 's/ *-//g' | { tr -d '\n'; echo ' \"{}\"' ; } \" \\;"
@@ -248,8 +258,6 @@ this allows for trigger show/hide behaviour if the same command is repeated.")
 (defun dired-annotator--load-annotation-info-from-folder ()
   "read all annotation files from the configured folder
 and put them in a hash along with the file-information stored with it"
-  (setq dired-annotator--hash-2-annotation (make-hash-table :test 'equal))
-  (setq dired-annotator--filepath-2-annotation (make-hash-table :test 'equal))
   (-each (directory-files dired-annotator-annotations-folder nil ".*\.org")
     (lambda (annotation-file-name)
       (ignore-errors
@@ -381,7 +389,8 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
     (+ 1 (overlay-start (car ov)))))
 
 (defun dired-annotator--wrapped-revert-buffer (orig-func &rest params)
-  "make sure that buffer reverts either hide remaining icons, or redisplays them appropriately"
+  "make sure that buffer reverts either hide remaining icons, 
+or redisplays them appropriately"
   (apply orig-func params)
   (dired-annotator--update-icon-display))
 

@@ -34,6 +34,7 @@
 (require 'uuid)
 (require 'dired)
 (require 'dash)
+(require 'package)
 
 (defgroup dired-annotator nil
   "annotate files integrated with dired"

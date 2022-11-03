@@ -181,7 +181,8 @@ this allows for trigger show/hide behaviour if the same command is repeated.")
 
 (defun log-message (level str &rest params)
   (when (<= level dired-annotator-log-level)
-    (message "DIRED-ANNOTATOR:%d: %s" level (apply 'format (cons str params)))))
+    (message "DIRED-ANNOTATOR:%d: %s" level (apply 'format (cons str params))))
+  (or (car (last params)) str))
 
 (defun dired-annotator--hash (file-name _hash-type)
   "get hash of the given type for the file"

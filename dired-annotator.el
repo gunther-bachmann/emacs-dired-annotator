@@ -64,6 +64,11 @@ has the note and the annotation information itself."
   :type 'hook
   :group 'dired-annotator)
 
+(defcustom dired-annotator-default-content "* Notes\n  some notes\n"
+  "content inserted when creating an annotation"
+  :type 'string
+  :group 'dired-annotator)
+
 (defcustom dired-annotator-after-icons-shown-hook #'dired-annotator--report-collection-stats
   "list of hooks called after new icons are shown.
 each hook is called with three parameters:
@@ -307,7 +312,7 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
                       (-snoc
                        (dired-annotator--collect-file-information absolute-file-name)
                        pinning-mode)))
-      (insert "* Notes\n  some notes\n"))
+      (insert dired-annotator-default-content))
     (dired-annotator--hash-file-information
      (dired-annotator--collect-file-information absolute-file-name)
      annotation-file-name)

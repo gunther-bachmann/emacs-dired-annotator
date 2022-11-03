@@ -136,6 +136,15 @@ only valid if integration with dired narrow is activated"
   nil
   "timer currently running to cleanup annotation buffers")
 
+(defvar dired-annotator-log-level 0
+  "level of logging, higher numbers log more
+0 = no logging
+1 = status logging
+2 =
+3 = shell commands are logged
+4 = /important/ function tracing
+5 = /other/ function call tracing")
+
 (defvar-local dired-annotator--icons-shown-p
   nil
   "are icons currently shown in the dired buffer")
@@ -168,6 +177,10 @@ this allows for trigger show/hide behaviour if the same command is repeated.")
        ,@body
        (float-time (time-since ,time-sym)))))
 
+(defun log-message (level str &rest params)
+  (when (<= level dired-annotator-log-level)
+    (message "DIRED-ANNOTATOR:%d: %s" level (apply 'format (cons str params)))))
+
 (defun dired-annotator--hash (file-name _hash-type)
   "get hash of the given type for the file"
   (cond (t ;; (eq hash-type 'head16kmd5)
@@ -175,9 +188,13 @@ this allows for trigger show/hide behaviour if the same command is repeated.")
 
 (defun dired-annotator--head16kmd5 (file-name)
   "get md5sum of the given FILE-NAME, taking the first SIZE bytes of the file"
-  (let ((dumpsize 16384))
-    (shell-command-to-string (format "head -c %d %s | md5sum | sed -e 's/ *-//g' | tr -d '\n'"
-                                     dumpsize (shell-quote-argument file-name)))))
+  (let* ((dumpsize 16384)
+         (cmd      (format "head -c %d %s | md5sum | sed -e 's/ *-//g'"
+                           dumpsize (shell-quote-argument file-name)))
+         (result   (string-trim (shell-command-to-string cmd))))
+    (log-message 3 "shell-command: %s" cmd)
+    (log-message 3 "result: %s" result)
+    result))
 
 (defun dired-annotator--head16kmd5s (directory-name)
   "get a list of pairs of file-name, md5sums of the files in DIRECTORY-NAME, 
@@ -270,13 +287,16 @@ and put them in a hash along with the file-information stored with it"
 (defun dired-annotator--read-fileinformation (annotation-file-name)
   "read and return the file information structure of the given file"
   (ignore-errors
-    (--> (format "head -c 512 %s/%s | grep '^#+property: file-information ' | sed -e 's/#+property: file-information \\(.*\\)/\\1/g'"
-               (shell-quote-argument dired-annotator-annotations-folder)
-               (shell-quote-argument annotation-file-name))
+    (let ((cmd (format "head -c 512 %s/%s | grep '^#+property: file-information ' | sed -e 's/#+property: file-information \\(.*\\)/\\1/g'"
+                 (shell-quote-argument dired-annotator-annotations-folder)
+                 (shell-quote-argument annotation-file-name))))
+      (--> cmd
+         (log-message 3 "shell-command: %s" it)
          (shell-command-to-string it)
          (string-trim it)
+         (log-message 3 "result: %s" it)
          (read-from-string it)
-         (car it))))
+         (car it)))))
 
 (defun dired-annotator--unhash-file (hash-key absolute-file-name)
   "remove given keys from hash
@@ -322,6 +342,7 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
 
 (defun dired-annotator--add-note-icon-to-line ()
   "add the note icon to the file of the current line"
+  (log-message 5 "adding note icon to point %d, line %d" (point) (current-line))
   (save-excursion
     (end-of-line)
     (dired-annotator--add-overlay (point) (concat " " dired-annotator-note-icon))))
@@ -332,6 +353,7 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
 
 (defun dired-annotator--remove-note-icon-from-line ()
   "remove note icon from the file of the current line"
+  (log-message 5 "removing note icon from point %d, line %d" (point) (current-line))
   (save-excursion
     (let (beg end)
       (beginning-of-line)
@@ -423,9 +445,10 @@ depending on buffer local variable DIRED-ANNOTATOR--ICONS-SHOWN-P"
 (defun dired-annotator--report-collection-stats (annotation-count file-count time)
   "hook to inform about the stats collected during annotation collection"
   (when (derived-mode-p 'dired-mode)
-    (message
-     (format "found %d notes looking at %d files in %f seconds in %s (and open subdirs)"
-             annotation-count file-count time default-directory))))
+    (log-message
+     1
+     "found %d notes looking at %d files in %f seconds in %s (and open subdirs)"
+     annotation-count file-count time default-directory)))
 
 (defun dired-annotator--any-buffer-showing-icons? ()
   "does any buffer exist that currently should show icons in dired?"
@@ -565,6 +588,7 @@ this contains very specific dired-narrow code that might change over time."
   (interactive)
   (if (not (derived-mode-p 'dired-mode))
       (message "only available in dired buffers")
+    (log-message 4 "edit/create note on file at line %d" (current-line))
     (let* ((absolute-file-name (dired-get-filename))
            (annotation (or (dired-annotator--get-annotation-for absolute-file-name)
                           (when-let* ((new-annotation
@@ -605,11 +629,13 @@ this contains very specific dired-narrow code that might change over time."
       (message "only available in dired buffers")
     (if dired-annotator--note-should-not-popup
         (setq dired-annotator--note-should-not-popup nil)
-      (when-let* ((absolute-file-name (dired-get-filename))
-                  (annotation (dired-annotator--get-annotation-for absolute-file-name))
-                  (annotation-abs-file-name (format "%s/%s" dired-annotator-annotations-folder annotation)))
-        (run-hook-with-args 'dired-annotator-note-popup-hook (or (dired-annotator--get-note-icon-position) (point)) annotation-abs-file-name)
-        (add-hook 'pre-command-hook #'dired-annotator--remove-note-popup)))))
+      (log-message 4 "show annotation if available on line %d" (current-line))
+      (ignore-errors
+        (when-let* ((absolute-file-name (dired-get-filename))
+                    (annotation (dired-annotator--get-annotation-for absolute-file-name))
+                    (annotation-abs-file-name (format "%s/%s" dired-annotator-annotations-folder annotation)))
+          (run-hook-with-args 'dired-annotator-note-popup-hook (or (dired-annotator--get-note-icon-position) (point)) annotation-abs-file-name)
+          (add-hook 'pre-command-hook #'dired-annotator--remove-note-popup))))))
 
 (defun dired-annotator-reload-annotation-info ()
   "reload annotation information from disk and adjust visible icons accordingly"
@@ -643,6 +669,7 @@ this contains very specific dired-narrow code that might change over time."
         (run-at-time dired-annotator-seconds-to-note-buffer-removal nil #'dired-annotator-clean-unused-note-buffers)))
 
 (defun dired-annotator-clean-unused-note-buffers ()
+  (log-message 4 "clean-unused-note-buffers")
   (let ((ts (format-time-string "%Y-%m-%d %T")))
     (dolist (buf (buffer-list))
       (let ((bn (buffer-name buf)))
@@ -685,6 +712,7 @@ this contains very specific dired-narrow code that might change over time."
 
       (defun dired-annotator--subtree--cleanup-icons-after-fold ()
         "remove any remaining icons after dired subtree is folded"
+        (log-message 4 "subtree--cleanup-icons-after-fold")
         (save-restriction
           (setq dir-local-variables-alist
 		(assq-delete-all 'dired-annotator-show dir-local-variables-alist))

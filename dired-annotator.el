@@ -736,4 +736,46 @@ this contains very specific dired-narrow code that might change over time."
 (when (file-directory-p dired-annotator-annotations-folder)
   (dired-annotator--load-annotation-info-from-folder))
 
+(defun dired-annotator--formatted-config-value (symbol)
+  (format "%s: %s" (symbol-name symbol) (symbol-value symbol)))
+
+(defun dired-annotator-collect-report-data ()
+  (interactive)  
+  (let ((report-buffer (get-buffer-create "*dired-annotator-report*"))
+        (values        (--map (format "%s\n" (dired-annotator--formatted-config-value it))
+                              '(dired-annotator-note-icon
+                                dired-annotator-modeline
+                                dired-annotator-after-icon-shown-hook
+                                dired-annotator-default-content
+                                dired-annotator-after-icons-shown-hook
+                                dired-annotator-after-icons-removed-hook
+                                dired-annotator-note-popup-hook
+                                dired-annotator-note-popup-remove-hook
+                                dired-annotator-note-fill-column
+                                dired-annotator-integrate-with-dired-narrow
+                                dired-annotator-show-non-tagged-on-narrow
+                                dired-annotator-seconds-to-note-buffer-removal
+                                dired-annotator--pinning-modes
+                                dired-annotator--hash-mode
+                                dired-annotator-buffer-cleanup-timer
+                                dired-annotator-log-level
+                                dired-annotator--icons-shown-p
+                                dired-annotator--note-should-not-popup
+                                dired-annotator-show))))
+    (with-current-buffer report-buffer
+      (insert (format "dired-annotator-report (%s)\n" (format-time-string "%Y-%m-%dT%T")))
+      (insert "configuration:\n")
+      (insert (format "dired-annotator-annotations-folder exists: %S" (file-directory-p dired-annotator-annotations-folder)))      
+      (--each values (insert it))
+      (let ((keys-fp2a (hash-table-keys dired-annotator--filepath-2-annotation))
+            (keys-ha2a (hash-table-keys dired-annotator--hash-2-annotation)))
+        (insert "Hash maps\n")
+        (insert "filepath -> annotation-file\n")
+        (--each keys-fp2a
+          (insert (format "filename (hashed to %s) -> %s\n" (md5 it) (gethash it dired-annotator--filepath-2-annotation))))
+        (insert "md5hash -> annotation-file\n")
+        (--each keys-ha2a
+          (insert (format "%s -> %s\n" it (gethash it dired-annotator--hash-2-annotation))))))
+    (pop-to-buffer report-buffer)))
+
 (provide 'dired-annotator)

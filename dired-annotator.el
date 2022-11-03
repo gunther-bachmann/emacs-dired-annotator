@@ -767,6 +767,11 @@ this contains very specific dired-narrow code that might change over time."
                                 dired-annotator-show))))
     (with-current-buffer report-buffer
       (insert (format "dired-annotator-report (%s)\n" (format-time-string "%Y-%m-%dT%T")))
+      (ignore-errors
+        (when-let* ((def-file (cdr (find-function-library 'dired-annotator-collect-report-data)))
+                    (folder (expand-file-name (format "%s/.." def-file)))
+                    (default-directory folder))
+          (insert (shell-command-to-string "git log HEAD -1 --abbrev-commit"))))
       (insert "configuration:\n")
       (insert (format "dired-annotator-annotations-folder exists: %S" (file-directory-p dired-annotator-annotations-folder)))      
       (--each values (insert it))

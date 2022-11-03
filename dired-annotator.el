@@ -123,10 +123,6 @@ only valid if integration with dired narrow is activated"
 ;; -------------------------------------------------------------------------------- internal only
 (defvar dired-annotator--pinning-modes '(immutable-file immutable-location)
   "list of symbols used as pinning-mode")
-(defvar dired-annotator--md5-2-annotation (make-hash-table :test 'equal)
-  "hash from md5 to annotation file")
-(defvar dired-annotator--filepath-2-annotation (make-hash-table :test 'equal)
-  "hash from complete absolute file path to annotation file")
 
 (defvar dired-annotator--hash-mode 'head16kmd5 "currently configured hash mode")
 

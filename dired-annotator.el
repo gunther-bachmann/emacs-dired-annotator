@@ -129,9 +129,11 @@ only valid if integration with dired narrow is activated"
 (defvar dired-annotator--hash-2-annotation
   (make-hash-table :test 'equal)
   "hashmap mapping file hash to annotation")
+
 (defvar dired-annotator--filepath-2-annotation
   (make-hash-table :test 'equal)
   "hashmap mapping filepath to annotation")
+
 (defvar dired-annotator-buffer-cleanup-timer
   nil
   "timer currently running to cleanup annotation buffers")

@@ -743,7 +743,8 @@ this contains very specific dired-narrow code that might change over time."
   (format "%s: %s" (symbol-name symbol) (symbol-value symbol)))
 
 (defun dired-annotator-collect-report-data ()
-  (interactive)  
+  (interactive)
+
   (let ((report-buffer (get-buffer-create "*dired-annotator-report*"))
         (values        (--map (format "%s\n" (dired-annotator--formatted-config-value it))
                               '(dired-annotator-note-icon

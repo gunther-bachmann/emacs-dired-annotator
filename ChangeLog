@@ -1,3 +1,13 @@
+2022-11-03  Gunther Bachmann  <gunther.bachmann@web.de>
+	version 0.0.6
+	* dired-annotator.el: add basic logging
+			      make initial note content configurable
+			      ignore errors when using `dired-get-filename`
+			      add function to collect/report configuration data
+	* README.org:	      add basic use cases
+	  		      add description for retrieving additional data for issue reporting
+			      add note to adjust load-path and default folder in complex configuration
+
 2022-11-02  Gunther Bachmann  <gunther.bachmann@web.de>
 	version 0.0.5
 	* dired-annotator.el: use shell-quote-argument to pass filenames to shell commands

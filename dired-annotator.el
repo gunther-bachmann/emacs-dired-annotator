@@ -147,9 +147,13 @@ only valid if integration with dired narrow is activated"
 4 = /important/ function tracing
 5 = /other/ function call tracing")
 
+(defvar dired-annotator-silent-log-level 1
+  "level of log message that are logged but not writting into the message area")
+
 (defvar-local dired-annotator--icons-shown-p
   nil
   "are icons currently shown in the dired buffer")
+
 (defvar-local dired-annotator--note-should-not-popup
   nil
   "note should not popup again if show note is triggered.
@@ -179,9 +183,20 @@ this allows for trigger show/hide behaviour if the same command is repeated.")
        ,@body
        (float-time (time-since ,time-sym)))))
 
+(with-ignored-messages)
+
+(defun construct-message-string (level str &rest params)
+  (format "DIRED-ANNOTATOR:%d: %s" level (apply 'format (cons str params))))
+
 (defun log-message (level str &rest params)
   (when (<= level dired-annotator-log-level)
-    (message "DIRED-ANNOTATOR:%d: %s" level (apply 'format (cons str params))))
+    (let ((msg (apply #'construct-message-string `(,level ,str ,@params))))
+      (if (<= dired-annotator-silent-log-level level)
+          (with-ignored-messages (message msg))
+        (message msg)))))
+
+(defun log-message-with-result (level str &rest params)
+  (apply #'log-message `(,level ,str ,@params))
   (or (car (last params)) str))
 
 (defun dired-annotator--hash (file-name _hash-type)
@@ -290,16 +305,20 @@ and put them in a hash along with the file-information stored with it"
 (defun dired-annotator--read-fileinformation (annotation-file-name)
   "read and return the file information structure of the given file"
   (ignore-errors
-    (let ((cmd (format "head -c 512 %s/%s | grep '^#+property: file-information ' | sed -e 's/#+property: file-information \\(.*\\)/\\1/g'"
+    (let* ((cmd (format "head -c 512 %s/%s | grep '^#+property: file-information ' | sed -e 's/#+property: file-information \\(.*\\)/\\1/g'"
                  (shell-quote-argument dired-annotator-annotations-folder)
-                 (shell-quote-argument annotation-file-name))))
-      (--> cmd
-         (log-message 3 "shell-command: %s" it)
-         (shell-command-to-string it)
-         (string-trim it)
-         (log-message 3 "result: %s" it)
-         (read-from-string it)
-         (car it)))))
+                 (shell-quote-argument annotation-file-name)))
+           (file-props
+            (--> cmd
+               (log-message-with-result 3 "shell-command: %s" it)
+               (shell-command-to-string it)
+               (string-trim it)
+               (log-message-with-result 3 "result: %s" it)
+               )))
+      (if (not (string-match-p "^(\"[0-9a-f][0-9a-f]*\" .* \\(immutable-file\\|immutable-location\\))$" file-props))
+          (log-message 0 "could not read the annotation reference from file %s" annotation-file-name)
+        (log-message 3 "successfully read annotation reference from file %s" annotation-file-name)
+        (car (read-from-string file-props))))))
 
 (defun dired-annotator--unhash-file (hash-key absolute-file-name)
   "remove given keys from hash
@@ -567,7 +586,7 @@ this contains very specific dired-narrow code that might change over time."
   "Display the note icon on files with notes in dired buffer."
   (interactive)
   (if (not (derived-mode-p 'dired-mode))
-      (message "only available in dired buffers")
+      (log-message 0 "only available in dired buffers")
     (-let [(annotation-count file-count time) (dired-annotator--show-icons)]
       (run-hook-with-args 'dired-annotator-after-icons-shown-hook annotation-count file-count time))
     (unless (dired-annotator--any-buffer-showing-icons?)
@@ -579,7 +598,7 @@ this contains very specific dired-narrow code that might change over time."
   "Remove all `dired-annotator' overlays."
   (interactive)
   (if (not (derived-mode-p 'dired-mode))
-      (message "only available in dired buffers")
+      (log-message 0 "only available in dired buffers")
     (setq dired-annotator--icons-shown-p nil)
     (dired-annotator--hide-icons)
     (unless (dired-annotator--any-buffer-showing-icons?)
@@ -590,7 +609,7 @@ this contains very specific dired-narrow code that might change over time."
   "create a new annotation and open it, or open an existing"
   (interactive)
   (if (not (derived-mode-p 'dired-mode))
-      (message "only available in dired buffers")
+      (log-message 0 "only available in dired buffers")
     (log-message 4 "edit/create note on file at line %d" (current-line))
     (let* ((absolute-file-name (dired-get-filename))
            (annotation (or (dired-annotator--get-annotation-for absolute-file-name)
@@ -614,7 +633,7 @@ this contains very specific dired-narrow code that might change over time."
   "delete an existing annotation (if present)"
   (interactive)
   (if (not (derived-mode-p 'dired-mode))
-      (message "only available in dired buffers")
+      (log-message 0 "only available in dired buffers")
     (when-let* ((annotated-file-name (dired-get-filename))
                 (annotation (dired-annotator--get-annotation-for annotated-file-name))
                 (annotation-file-name (dired-annotator--to-abs-file annotation)))
@@ -629,7 +648,7 @@ this contains very specific dired-narrow code that might change over time."
   "display the annotation (if existent)"
   (interactive)
   (if (not (derived-mode-p 'dired-mode))
-      (message "only available in dired buffers")
+      (log-message 0 "only available in dired buffers")
     (if dired-annotator--note-should-not-popup
         (setq dired-annotator--note-should-not-popup nil)
       (log-message 4 "show annotation if available on line %d" (current-line))
@@ -648,7 +667,7 @@ this contains very specific dired-narrow code that might change over time."
         (dired-annotator--load-annotation-info-from-folder)
         (when dired-annotator--icons-shown-p
           (dired-annotator--show-icons)))
-    (message (format "folder for annotations unknown (%s)" dired-annotator-annotations-folder))))
+    (log-message 0 "folder for annotations unknown (%s)" dired-annotator-annotations-folder)))
 
 (defun dired-annotator-dired-on-annotation-folder ()
   "open annotation folder via dired"
@@ -677,12 +696,12 @@ this contains very specific dired-narrow code that might change over time."
     (dolist (buf (buffer-list))
       (let ((bn (buffer-name buf)))
         (when (buffer-live-p buf)
-          (message "[%s] `%s'" ts bn)
+          (log-message 1 "[%s] `%s'" ts bn)
           (unless (or (get-buffer-process buf)
                      (and (buffer-file-name buf) (buffer-modified-p buf))
                      (not (dired-annotator-buffer-is-note-p buf))
                      (get-buffer-window buf 'visible))
-            (message "[%s] killing `%s'" ts bn)
+            (log-message 1 "[%s] killing `%s'" ts bn)
             (kill-buffer buf))))))
   (setq dired-annotator-buffer-cleanup-timer nil))
 

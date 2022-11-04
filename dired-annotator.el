@@ -35,6 +35,7 @@
 (require 'dired)
 (require 'dash)
 (require 'package)
+(require 'ert)
 
 (defgroup dired-annotator nil
   "annotate files integrated with dired"
@@ -64,8 +65,13 @@ has the note and the annotation information itself."
   :type 'hook
   :group 'dired-annotator)
 
-(defcustom dired-annotator-default-content "* Notes\n  some notes\n"
+(defcustom dired-annotator-default-content "* Note"
   "content inserted when creating an annotation"
+  :type 'string
+  :group 'dired-annotator)
+
+(defcustom dired-annotator-place-cursor-on "Note"
+  "content searched for and placing cursor on"
   :type 'string
   :group 'dired-annotator)
 
@@ -121,6 +127,18 @@ only valid if integration with dired narrow is activated"
   :group 'dired-annotator)
 
 ;; -------------------------------------------------------------------------------- internal only
+(defvar dired-annotator-hashing-shell-command
+  "head -c 16384 %s | md5sum | sed -e 's/ *-//g'"
+  "shell command to md5 hash the first 16k of  the file")
+
+(defvar dired-annotator-read-file-information-from-annotations
+  "head -c 512 %s/%s | grep '^#+property: file-information ' | sed -e 's/#+property: file-information \\(.*\\)/\\1/g'"
+  "shell command to read file-information from annotation file")
+
+(defvar dired-annotator-read-hashes-from-files
+  "find %s -type f -maxdepth 1 -exec sh -c \"head -c 16384 \"{}\" 2>/dev/null | md5sum | sed -e 's/ *-//g' | { tr -d '\n'; echo ' \"{}\"' ; } \" \\;"
+  "shell command to read hash-filename-pairs from directory")
+
 (defvar dired-annotator--pinning-modes '(immutable-file immutable-location)
   "list of symbols used as pinning-mode")
 
@@ -140,7 +158,7 @@ only valid if integration with dired narrow is activated"
 
 (defvar dired-annotator-log-level 0
   "level of logging, higher numbers log more
-0 = no logging
+0 = warnings/errors
 1 = status logging
 2 =
 3 = shell commands are logged
@@ -195,6 +213,7 @@ this allows for trigger show/hide behaviour if the same command is repeated.")
   (format "DIRED-ANNOTATOR:%d: %s" level (apply 'format (cons str params))))
 
 (defun log-message (level str &rest params)
+  "log the given STR formatted with PARAMS if LEVEL <= configured log level"
   (when (<= level dired-annotator-log-level)
     (let ((msg (apply #'construct-message-string `(,level ,str ,@params))))
       (if (<= dired-annotator-silent-log-level level)
@@ -202,6 +221,7 @@ this allows for trigger show/hide behaviour if the same command is repeated.")
         (message msg)))))
 
 (defun log-message-with-result (level str &rest params)
+  "log the message and return the last argument of this call as result"
   (apply #'log-message `(,level ,str ,@params))
   (or (car (last params)) str))
 
@@ -212,9 +232,7 @@ this allows for trigger show/hide behaviour if the same command is repeated.")
 
 (defun dired-annotator--head16kmd5 (file-name)
   "get md5sum of the given FILE-NAME, taking the first SIZE bytes of the file"
-  (let* ((dumpsize 16384)
-         (cmd      (format "head -c %d %s | md5sum | sed -e 's/ *-//g'"
-                           dumpsize (shell-quote-argument file-name)))
+  (let* ((cmd      (format dired-annotator-hashing-shell-command (shell-quote-argument file-name)))
          (result   (string-trim (shell-command-to-string cmd))))
     (log-message 3 "shell-command: %s" cmd)
     (log-message 3 "result: %s" result)
@@ -223,10 +241,9 @@ this allows for trigger show/hide behaviour if the same command is repeated.")
 (defun dired-annotator--head16kmd5s (directory-name)
   "get a list of pairs of file-name, md5sums of the files in DIRECTORY-NAME, 
 taking the first SIZE bytes of each file"
-  (let* ((dumpsize 16384)
-         (dir-result (shell-command-to-string
-                      (format "find %s -type f -maxdepth 1 -exec sh -c \"head -c %d \"{}\" 2>/dev/null | md5sum | sed -e 's/ *-//g' | { tr -d '\n'; echo ' \"{}\"' ; } \" \\;"
-                              (shell-quote-argument directory-name) dumpsize))))
+  (let* ((dir-result (shell-command-to-string
+                      (format dired-annotator-read-hashes-from-files
+                              (shell-quote-argument directory-name)))))
     (--map (list (substring it 33)
                  (substring it 0 32)
                  'head16kmd5)
@@ -311,7 +328,7 @@ and put them in a hash along with the file-information stored with it"
 (defun dired-annotator--read-fileinformation (annotation-file-name)
   "read and return the file information structure of the given file"
   (ignore-errors
-    (let* ((cmd (format "head -c 512 %s/%s | grep '^#+property: file-information ' | sed -e 's/#+property: file-information \\(.*\\)/\\1/g'"
+    (let* ((cmd (format dired-annotator-read-file-information-from-annotations
                  (shell-quote-argument dired-annotator-annotations-folder)
                  (shell-quote-argument annotation-file-name)))
            (file-props
@@ -334,39 +351,66 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
   (puthash hash-key nil dired-annotator--hash-2-annotation)
   (puthash absolute-file-name nil dired-annotator--filepath-2-annotation))
 
+(ert-deftest --unhash-file-test ()
+  (should (eq nil (let ((file-information (list "abcd" "/folder/" "filename" 1570975206 "2022-03-17T20:10:44" 'immutable-location)))
+                  (dired-annotator--hash-file-information file-information "annotation.org")
+                  (dired-annotator--unhash-file "abcd" "/folder/filename")
+                  (dired-annotator--get-annotation-for "/folder/filename")))))
+
+(ert-deftest --hash-file-information ()
+  (should (string-equal "annotation.org"
+                        (let ((file-information (list "abcd" "/folder/" "filename" 1570975206 "2022-03-17T20:10:44" 'immutable-location)))
+                          (dired-annotator--hash-file-information file-information "annotation.org")
+                          (dired-annotator--get-annotation-for "/folder/filename")))))
+
+(defun dired-annotator--absolute-file-name-for (file-information)
+  "get absoulte filename for FILE-INFORMATION"
+  (format "%s%s"
+          (dired-annotator--fi-dir file-information)
+          (dired-annotator--fi-name file-information)))
+
 (defun dired-annotator--hash-file-information (file-information annotation-file-name)
   "put the given file-information along with the annotation-file into the hash"
   (let ((pinning (dired-annotator--fi-pinning file-information)))
     (cond ((eq pinning 'immutable-location)
-           (puthash (format "%s%s"
-                            (dired-annotator--fi-dir file-information)
-                            (dired-annotator--fi-name file-information))
+           (puthash (dired-annotator--absolute-file-name-for file-information)
                     annotation-file-name dired-annotator--filepath-2-annotation))
           (t ;; (eq pinning 'immutable-file)
            (puthash (dired-annotator--fi-hash file-information)
                     annotation-file-name
                     dired-annotator--hash-2-annotation)))))
 
+(defun dired-annotator--create-initial-note-content (file-information pinning-mode)
+  "create initial note content from FILE-INFORMATION and PINNING-MODE"
+  (string-join (list (format "#+title: %s" (dired-annotator--fi-name file-information))
+                     (format "#+property: file-information %S" (-snoc file-information pinning-mode))
+                     dired-annotator-default-content)
+               "\n"))
+
+(ert-deftest --create-initial-note-content ()
+  (should (string-equal "#+title: some.mkv\n#+property: file-information (\"abcd\" \"/folder/\" \"some.mkv\" 1570975206 \"2022-03-17T20:10:44\" immutable-file)\n* test"
+                        (let ((dired-annotator-default-content "* test")
+                              (file-information (list "abcd" "/folder/" "some.mkv" 1570975206 "2022-03-17T20:10:44")))
+                          (dired-annotator--create-initial-note-content file-information 'immutable-file)))))
+
 (defun dired-annotator--create-annotation (absolute-file-name pinning-mode)
   "create a blank annotation for ABSOLUTE-FILE-NAME"
-  (let ((annotation-file-name (format "%s.org" (uuid-string))))
+  (let ((annotation-file-name (format "%s.org" (uuid-string)))
+        (file-information     (dired-annotator--collect-file-information absolute-file-name)))
     (with-temp-file (dired-annotator--to-abs-file annotation-file-name)
-      (insert (format "#+title: %s\n" (file-name-nondirectory absolute-file-name)))
-      (insert (format "#+property: file-information %S\n"
-                      (-snoc
-                       (dired-annotator--collect-file-information absolute-file-name)
-                       pinning-mode)))
-      (insert dired-annotator-default-content))
-    (dired-annotator--hash-file-information
-     (dired-annotator--collect-file-information absolute-file-name)
-     annotation-file-name)
+      (insert (dired-annotator--create-initial-note-content file-information pinning-mode) ))
+    (dired-annotator--hash-file-information file-information annotation-file-name)
     annotation-file-name))
 
 (defun dired-annotator--get-annotation-for (absolute-file-name)
-  "get the annotation of the given file (if existent) from the hash"
+  "get the annotation of the given file (if existent) from the hash"  
   (let ((file-information (dired-annotator--collect-file-information absolute-file-name)))
-    (or (gethash (dired-annotator--fi-hash file-information) dired-annotator--hash-2-annotation)
-       (gethash absolute-file-name dired-annotator--filepath-2-annotation))))
+    (dired-annotator--get-annotation-for-fi file-information)))
+
+(defun dired-annotator--get-annotation-for-fi (file-information)
+  "get the annotation of the given file information (if existent)"
+  (or (gethash (dired-annotator--fi-hash file-information) dired-annotator--hash-2-annotation)
+     (gethash (dired-annotator--absolute-file-name-for file-information) dired-annotator--filepath-2-annotation)))
 
 (defun dired-annotator--add-note-icon-to-line ()
   "add the note icon to the file of the current line"
@@ -625,15 +669,16 @@ this contains very specific dired-narrow code that might change over time."
                                         (intern (completing-read "pinning-mode: " dired-annotator--pinning-modes)))))
                             (when dired-annotator--icons-shown-p (dired-annotator--add-note-icon-to-line))
                             new-annotation)))
-           (annotation-file-name (format "%s/%s" dired-annotator-annotations-folder annotation)))
+           (annotation-file-name (dired-annotator--to-abs-file annotation)))
       (when-let ((fb (get-file-buffer annotation-file-name)))
         (kill-buffer fb))
       (find-file annotation-file-name)
       (when (integerp dired-annotator-note-fill-column)
         (setq fill-column dired-annotator-note-fill-column))
       (org-show-all)
-      (when (= (point-min) (point))
-        (search-forward "some notes" nil t)))))
+      (when (and (= (point-min) (point))
+               (stringp dired-annotator-place-cursor-on))
+        (search-forward dired-annotator-place-cursor-on nil t)))))
 
 (defun dired-annotator-delete-note ()
   "delete an existing annotation (if present)"
@@ -681,7 +726,6 @@ this contains very specific dired-narrow code that might change over time."
   (dired dired-annotator-annotations-folder))
 
 (when dired-annotator-integrate-with-dired-narrow
-
   (defun dired-annotator-narrow-on-tag ()
     "Narrow a dired buffer to the files having annotations with the given tag."
     (interactive)
@@ -691,12 +735,14 @@ this contains very specific dired-narrow code that might change over time."
 
 ;; -------------------------------------------------------------------------------- remove open notes after some time
 (defun dired-annotator-register-buffer-cleanup ()
+  "make sure to cleanup annotation buffers once in a while"
   (when dired-annotator-buffer-cleanup-timer
     (cancel-timer dired-annotator-buffer-cleanup-timer))
   (setq dired-annotator-buffer-cleanup-timer
         (run-at-time dired-annotator-seconds-to-note-buffer-removal nil #'dired-annotator-clean-unused-note-buffers)))
 
 (defun dired-annotator-clean-unused-note-buffers ()
+  "remove unused annotation buffers"
   (log-message 4 "clean-unused-note-buffers")
   (let ((ts (format-time-string "%Y-%m-%d %T")))
     (dolist (buf (buffer-list))
@@ -727,8 +773,7 @@ this contains very specific dired-narrow code that might change over time."
                                     (format "%s/../" filename)
                                   (file-name-directory filename)))
                     (folder (expand-file-name foldername)))
-          (dired-annotator--with-default-directory
-              folder
+          (dired-annotator--with-default-directory folder
             (hack-dir-local-variables) ;; don't apply, just collect
             (when-let ((found (--find (eq 'dired-annotator-show (car it)) dir-local-variables-alist)))
               (setq dired-annotator-show (cdr found))))
@@ -760,16 +805,15 @@ this contains very specific dired-narrow code that might change over time."
       (when (boundp 'dired-subtree-after-remove-hook)
         (add-hook 'dired-subtree-after-remove-hook #'dired-annotator--subtree--cleanup-icons-after-fold)))))
 
-;; --------------------------------------------------------------------------------
-(when (file-directory-p dired-annotator-annotations-folder)
-  (dired-annotator--load-annotation-info-from-folder))
+;; -------------------------------------------------------------------------------- reporting
 
 (defun dired-annotator--formatted-config-value (symbol)
+  "format a config symbol for reporting"
   (format "%s: %s" (symbol-name symbol) (symbol-value symbol)))
 
 (defun dired-annotator-collect-report-data ()
+  "collect data for reporting issues"
   (interactive)
-
   (let ((report-buffer (get-buffer-create "*dired-annotator-report*"))
         (values        (--map (format "%s\n" (dired-annotator--formatted-config-value it))
                               '(dired-annotator-note-icon
@@ -811,5 +855,9 @@ this contains very specific dired-narrow code that might change over time."
         (--each keys-ha2a
           (insert (format "%s -> %s\n" it (gethash it dired-annotator--hash-2-annotation))))))
     (pop-to-buffer report-buffer)))
+
+;; --------------------------------------------------------------------------------
+(when (file-directory-p dired-annotator-annotations-folder)
+  (dired-annotator--load-annotation-info-from-folder))
 
 (provide 'dired-annotator)

@@ -183,7 +183,13 @@ this allows for trigger show/hide behaviour if the same command is repeated.")
        ,@body
        (float-time (time-since ,time-sym)))))
 
-(with-ignored-messages)
+(defmacro with-ignored-messages (&rest body)
+  "ignore all messages during execution of body"
+  `(progn
+     (setq inhibit-message t)
+     (unwind-protect
+         (progn ,@body)
+       (setq inhibit-message nil))))
 
 (defun construct-message-string (level str &rest params)
   (format "DIRED-ANNOTATOR:%d: %s" level (apply 'format (cons str params))))

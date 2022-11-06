@@ -1,0 +1,7 @@
+(add-to-list 'load-path "./build/emacs-uuid")
+(add-to-list 'load-path "./build/dash.el")
+(add-to-list 'load-path ".")
+(require 'uuid)
+(require 'dash)
+(setq dired-annotator-integrate-with-dired-narrow nil)
+(require 'dired-annotator)

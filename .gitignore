@@ -10,3 +10,8 @@
 # Undo-tree save-files
 *.~undo-tree
 **/orig/*
+
+# build
+build/*
+compile.out.*
+test.out.*

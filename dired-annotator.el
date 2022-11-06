@@ -194,6 +194,18 @@ this allows for trigger show/hide behaviour if the same command is repeated.")
 (unless (dired-annotator--os-prerequisites-met?)
   (warn "dired-annotator: os prerequisites not met."))
 
+;; -------------------------------------------------------------------------------- compatibility 
+(declare-function array-current-line nil)
+(declare-function dired-annotator--current-line nil)
+
+(if (fboundp #'array-current-line)
+    (defalias 'dired-annotator--current-line #'array-current-line)
+  (with-no-warnings (defalias 'dired-annotator--current-line #'current-line)))
+
+(ert-deftest compatibility-tests ()
+  "smoke tests"
+  (should (= 0 (save-excursion (goto-char 0) (dired-annotator--current-line)))))
+
 ;; --------------------------------------------------------------------------------
 
 (defmacro measure-time (&rest body)
@@ -417,7 +429,7 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
 
 (defun dired-annotator--add-note-icon-to-line ()
   "add the note icon to the file of the current line"
-  (log-message 5 "adding note icon to point %d, line %d" (point) (current-line))
+  (log-message 5 "adding note icon to point %d, line %d" (point) (dired-annotator--current-line))
   (save-excursion
     (end-of-line)
     (dired-annotator--add-overlay (point) (concat " " dired-annotator-note-icon))))
@@ -428,7 +440,7 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
 
 (defun dired-annotator--remove-note-icon-from-line ()
   "remove note icon from the file of the current line"
-  (log-message 5 "removing note icon from point %d, line %d" (point) (current-line))
+  (log-message 5 "removing note icon from point %d, line %d" (point) (dired-annotator--current-line))
   (save-excursion
     (let (beg end)
       (beginning-of-line)
@@ -676,7 +688,7 @@ this contains very specific dired-narrow code that might change over time."
   (interactive)
   (if (not (derived-mode-p 'dired-mode))
       (log-message 0 "only available in dired buffers")
-    (log-message 4 "edit/create note on file at line %d" (current-line))
+    (log-message 4 "edit/create note on file at line %d" (dired-annotator--current-line))
     (let* ((absolute-file-name (dired-get-filename))
            (annotation (or (dired-annotator--get-annotation-for absolute-file-name)
                           (when-let* ((new-annotation
@@ -718,7 +730,7 @@ this contains very specific dired-narrow code that might change over time."
       (log-message 0 "only available in dired buffers")
     (if dired-annotator--note-should-not-popup
         (setq dired-annotator--note-should-not-popup nil)
-      (log-message 4 "show annotation if available on line %d" (current-line))
+      (log-message 4 "show annotation if available on line %d" (dired-annotator--current-line))
       (ignore-errors
         (when-let* ((absolute-file-name (dired-get-filename))
                     (annotation (dired-annotator--get-annotation-for absolute-file-name))

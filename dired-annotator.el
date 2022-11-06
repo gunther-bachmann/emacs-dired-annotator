@@ -36,6 +36,9 @@
 (require 'dash)
 (require 'package)
 (require 'ert)
+(require 'array)
+
+(declare-function org-show-all nil)
 
 (defgroup dired-annotator nil
   "annotate files integrated with dired"
@@ -529,6 +532,8 @@ depending on buffer local variable DIRED-ANNOTATOR--ICONS-SHOWN-P"
                dired-annotator--icons-shown-p))
           (buffer-list)))
 
+(declare-function dired-omit-expunge nil)
+
 (defun dired-annotator--add-integration-advices ()
   "add all advices for integrating dired-annotator with others"
   (advice-add 'revert-buffer :around #'dired-annotator--wrapped-revert-buffer)
@@ -570,6 +575,10 @@ depending on buffer local variable DIRED-ANNOTATOR--ICONS-SHOWN-P"
 
 ;; -------------------------------------------------------------------------------- org tags via org-ql
 (when (package-installed-p 'org-ql)
+
+  (declare-function org-get-tags nil)
+  (declare-function org-ql-select nil)
+  
   (defun dired-annotator--get-tags-for (absolute-file-name)
     "get tags of the annotation for the given file"
     (when-let* ((annotation-file (dired-annotator--get-annotation-for absolute-file-name)))
@@ -592,6 +601,11 @@ depending on buffer local variable DIRED-ANNOTATOR--ICONS-SHOWN-P"
 (when dired-annotator-integrate-with-dired-narrow
 
   (require 'dired-narrow)
+  (declare-function dired-narrow-mode nil)
+  (declare-function dired-narrow--update nil)
+  (declare-function dired-narrow--remove-text-with-property nil)
+  (declare-function dired-utils-get-filename nil)
+  (declare-function dired-annotator--get-tags-for nil)
 
   (defun dired-annotator--tag-filter-function (tag)
     "should the file under cursor be filtered given this TAG?"
@@ -611,13 +625,15 @@ depending on buffer local variable DIRED-ANNOTATOR--ICONS-SHOWN-P"
     "integrate with dired-narrow
 
 this contains very specific dired-narrow code that might change over time."
-    (setq dired-narrow-filter-function filter-function)
+    (when (boundp 'dired-narrow-filter-function)
+      (setq dired-narrow-filter-function filter-function))
     (dired-narrow-mode 1)
     (add-to-invisibility-spec :dired-narrow)
     (dired-narrow--update initial-filter)
     (let ((inhibit-read-only t))
       (dired-narrow--remove-text-with-property :dired-narrow))
-    (funcall dired-narrow-exit-action)))
+    (when (boundp 'dired-narrow-exit-action)
+      (funcall dired-narrow-exit-action))))
 
 ;; -------------------------------------------------------------------------------- API
 (defun dired-annotator-modeline-function ()
@@ -726,6 +742,9 @@ this contains very specific dired-narrow code that might change over time."
   (dired dired-annotator-annotations-folder))
 
 (when dired-annotator-integrate-with-dired-narrow
+  (declare-function dired-annotator--minimal-narrow nil)
+  (declare-function dired-annotator--get-all-tags nil)
+  
   (defun dired-annotator-narrow-on-tag ()
     "Narrow a dired buffer to the files having annotations with the given tag."
     (interactive)
@@ -764,6 +783,10 @@ this contains very specific dired-narrow code that might change over time."
 
 ;; -------------------------------------------------------------------------------- dired-subtree integration
 (when (package-installed-p 'dired-subtree)
+  (declare-function dired-annotator--subtree--cleanup-icons-after-fold nil)
+  (declare-function dired-annotator--subtree--possibly-show-for-inserted nil)
+  (declare-function dired-subtree--get-ov nil)
+  
   (eval-after-load 'dired-subtree
     (progn
       (defun dired-annotator--subtree--possibly-show-for-inserted ()
@@ -774,9 +797,9 @@ this contains very specific dired-narrow code that might change over time."
                                   (file-name-directory filename)))
                     (folder (expand-file-name foldername)))
           (dired-annotator--with-default-directory folder
-            (hack-dir-local-variables) ;; don't apply, just collect
-            (when-let ((found (--find (eq 'dired-annotator-show (car it)) dir-local-variables-alist)))
-              (setq dired-annotator-show (cdr found))))
+                                                   (hack-dir-local-variables) ;; don't apply, just collect
+                                                   (when-let ((found (--find (eq 'dired-annotator-show (car it)) dir-local-variables-alist)))
+                                                     (setq dired-annotator-show (cdr found))))
           (when (or (bound-and-true-p dired-annotator-show)
                    (and (not (boundp dired-annotator-show))
                       dired-annotator--icons-shown-p))

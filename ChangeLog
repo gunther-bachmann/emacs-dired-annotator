@@ -1,3 +1,8 @@
+	* project setup	      add github action
+	* dired-annotator.el: add basic testing
+	  		      complete logging
+			      add capability to do testing
+
 2022-11-03  Gunther Bachmann  <gunther.bachmann@web.de>
 	version 0.0.6
 	* dired-annotator.el: add basic logging

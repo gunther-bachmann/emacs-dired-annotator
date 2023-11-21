@@ -58,7 +58,7 @@
 (defcustom dired-annotator-modeline
   '(:eval (dired-annotator-modeline-function))
   "element that is added to the modeline"
-  :type 'list
+  :type '(sexp)
   :group 'dired-annotator)
 
 (defcustom dired-annotator-after-icon-shown-hook '()

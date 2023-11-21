@@ -131,7 +131,7 @@ only valid if integration with dired narrow is activated"
 
 ;; -------------------------------------------------------------------------------- internal only
 (defvar dired-annotator-hashing-shell-command
-  "head -c 16384 %s | md5sum | sed -e 's/ *-//g'"
+  "if [ -d \"%s\" ]; then echo \"%s\"; else head -c 16384 \"%s\"; fi | md5sum | sed -e 's/ *-//g'"
   "shell command to md5 hash the first 16k of  the file")
 
 (defvar dired-annotator-read-file-information-from-annotations
@@ -247,7 +247,8 @@ this allows for trigger show/hide behaviour if the same command is repeated.")
 
 (defun dired-annotator--head16kmd5 (file-name)
   "get md5sum of the given FILE-NAME, taking the first SIZE bytes of the file"
-  (let* ((cmd      (format dired-annotator-hashing-shell-command (shell-quote-argument file-name)))
+  (let* ((qfname   (shell-quote-argument file-name))
+         (cmd      (format dired-annotator-hashing-shell-command  qfname qfname qfname))
          (result   (string-trim (shell-command-to-string cmd))))
     (log-message 3 "shell-command: %s" cmd)
     (log-message 3 "result: %s" result)
@@ -483,7 +484,6 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
                  (cl-incf file-count)
                  (ignore-errors
                    (when-let* ((file (dired-get-filename))
-                               (not-directory (not (file-directory-p file)))
                                (file-regular-p file)
                                (visible (not (get-text-property (line-beginning-position) 'invisible)))
                                (annotation (dired-annotator--get-annotation-for file)))

@@ -29,7 +29,7 @@ compile: pkg_uuid pkg_dash_el
 
 test: compile
 	@echo "test:"
-	emacs -q -l init.test.el --batch --eval "(ert-run-tests-batch)" | tee test.out.txt
+	emacs -q -l init.test.el --batch --eval "(ert-run-tests-batch)" 2>&1 | tee test.out.txt
 
 clean:
 	rm build/ -rf

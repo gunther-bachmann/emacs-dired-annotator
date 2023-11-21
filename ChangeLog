@@ -1,24 +1,28 @@
-	* project setup	      add github action
-	* dired-annotator.el: add basic testing
-	  		      complete logging
-			      add capability to do testing
+2023-11-21  Gunther Bachmann  <gunther.bachmann@web.de>
+        version 0.0.7
+        * project setup       add github action
+                              add Makefile
+        * dired-annotator.el: add basic testing
+                              complete logging
+                              add capability to do testing
+			      allow annotating directories
 
 2022-11-03  Gunther Bachmann  <gunther.bachmann@web.de>
-	version 0.0.6
-	* dired-annotator.el: add basic logging
-			      make initial note content configurable
-			      ignore errors when using `dired-get-filename`
-			      add function to collect/report configuration data
-	* README.org:	      add basic use cases
-	  		      add description for retrieving additional data for issue reporting
-			      add note to adjust load-path and default folder in complex configuration
+        version 0.0.6
+        * dired-annotator.el: add basic logging
+                              make initial note content configurable
+                              ignore errors when using `dired-get-filename`
+                              add function to collect/report configuration data
+        * README.org:         add basic use cases
+                              add description for retrieving additional data for issue reporting
+                              add note to adjust load-path and default folder in complex configuration
 
 2022-11-02  Gunther Bachmann  <gunther.bachmann@web.de>
-	version 0.0.5
-	* dired-annotator.el: use shell-quote-argument to pass filenames to shell commands
-	  		      early init of some hash maps
-			      fix some issues when natively compiling
-	* README.org:	      make sure to point out that the default folder for annotations should be set
+        version 0.0.5
+        * dired-annotator.el: use shell-quote-argument to pass filenames to shell commands
+                              early init of some hash maps
+                              fix some issues when natively compiling
+        * README.org:         make sure to point out that the default folder for annotations should be set
 
 2022-02-04  Gunther Bachmann  <gunther.bachmann@web.de>
         version 0.0.4

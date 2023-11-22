@@ -1,11 +1,16 @@
 2023-11-21  Gunther Bachmann  <gunther.bachmann@web.de>
+        version 0.0.8
+        * dired-annotator.el: fix shell command failures
+                                fix subtree glitches on icon display/hide
+
+2023-11-21  Gunther Bachmann  <gunther.bachmann@web.de>
         version 0.0.7
         * project setup       add github action
                               add Makefile
         * dired-annotator.el: add basic testing
                               complete logging
                               add capability to do testing
-			      allow annotating directories
+                              allow annotating directories
 
 2022-11-03  Gunther Bachmann  <gunther.bachmann@web.de>
         version 0.0.6

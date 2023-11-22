@@ -490,7 +490,7 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
                  (cl-incf file-count)
                  (ignore-errors
                    (when-let* ((file (dired-get-filename))
-                               (_ (or (file-regular-p file)
+                               (is-a-file-or-dir (or (file-regular-p file)
                                      (file-directory-p file)))
                                (visible (not (get-text-property (line-beginning-position) 'invisible)))
                                (annotation (dired-annotator--get-annotation-for file)))

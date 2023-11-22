@@ -131,8 +131,12 @@ only valid if integration with dired narrow is activated"
 
 ;; -------------------------------------------------------------------------------- internal only
 (defvar dired-annotator-hashing-shell-command
-  "if [ -d \"%s\" ]; then echo \"%s\"; else head -c 16384 \"%s\"; fi | md5sum | sed -e 's/ *-//g'"
+  "head -c 16384 %s | md5sum | sed -e 's/ *-//g'"
   "shell command to md5 hash the first 16k of  the file")
+
+(defvar dired-annotator-folder-hashing-shell-command
+  "echo %s | md5sum | sed -e 's/ *-//g'"
+  "shell command to md5 hash the name of the file (for directories)")
 
 (defvar dired-annotator-read-file-information-from-annotations
   "head -c 512 %s/%s | grep '^#+property: file-information ' | sed -e 's/#+property: file-information \\(.*\\)/\\1/g'"
@@ -248,7 +252,9 @@ this allows for trigger show/hide behaviour if the same command is repeated.")
 (defun dired-annotator--head16kmd5 (file-name)
   "get md5sum of the given FILE-NAME, taking the first SIZE bytes of the file"
   (let* ((qfname   (shell-quote-argument file-name))
-         (cmd      (format dired-annotator-hashing-shell-command  qfname qfname qfname))
+         (cmd      (if (file-directory-p file-name)
+                       (format dired-annotator-folder-hashing-shell-command  qfname)
+                     (format dired-annotator-hashing-shell-command  qfname)))
          (result   (string-trim (shell-command-to-string cmd))))
     (log-message 3 "shell-command: %s" cmd)
     (log-message 3 "result: %s" result)
@@ -484,9 +490,11 @@ ABSOLUTE-FILE-NAME is the absolute file name of the annotated file"
                  (cl-incf file-count)
                  (ignore-errors
                    (when-let* ((file (dired-get-filename))
-                               (file-regular-p file)
+                               (_ (or (file-regular-p file)
+                                     (file-directory-p file)))
                                (visible (not (get-text-property (line-beginning-position) 'invisible)))
                                (annotation (dired-annotator--get-annotation-for file)))
+                     (dired-annotator--remove-note-icon-from-line)
                      (dired-annotator--add-note-icon-to-line)
                      (run-hook-with-args 'dired-annotator-after-icon-shown-hook file annotation)
                      (cl-incf annotation-count)
@@ -813,7 +821,7 @@ this contains very specific dired-narrow code that might change over time."
                                                    (when-let ((found (--find (eq 'dired-annotator-show (car it)) dir-local-variables-alist)))
                                                      (setq dired-annotator-show (cdr found))))
           (when (or (bound-and-true-p dired-annotator-show)
-                   (and (not (boundp dired-annotator-show))
+                   (and ;; (not (boundp dired-annotator-show))
                       dired-annotator--icons-shown-p))
             (let ((ov (dired-subtree--get-ov)))
               (dired-annotator--show-icons-in-region (overlay-start ov) (overlay-end ov))))))
@@ -832,7 +840,9 @@ this contains very specific dired-narrow code that might change over time."
             (forward-line)
             (beginning-of-line)
             (let ((end (1+ (point))))
-              (dired-annotator--delete-overlay-between line end)))))
+              (dired-annotator--delete-overlay-between line end)
+              (when dired-annotator--icons-shown-p
+                (dired-annotator--show-icons-in-region line end))))))
 
       (when (boundp 'dired-subtree-after-insert-hook)
         (add-hook 'dired-subtree-after-insert-hook #'dired-annotator--subtree--possibly-show-for-inserted))
